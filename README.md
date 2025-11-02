@@ -71,8 +71,8 @@ Coming soon - The system is currently under development.
 ## 🗺️ Roadmap
 
 - [x] Project planning and architecture design
-- [ ] phase 1: Research & Analysis Agents
-- [ ] phase 2: Strategy Agent + Positioning Map
+- [x] phase 1: Research & Analysis Agents
+- [x] phase 2: Strategy Agent + Positioning Map
 - [ ] phase 3: Quality Agent + Streamlit UI
 - [ ] phase 4: Caching + Testing
 - [ ] phase 5: Content Gap Analysis
