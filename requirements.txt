@@ -1,0 +1,45 @@
+# Core AI/ML
+langchain
+langchain-community
+langchain-openai
+langgraph
+openai
+
+# Vector Store & Embeddings
+faiss-cpu
+sentence-transformers
+
+# Data Collection
+google-search-results  # Serper.dev client
+pytrends
+praw  # Reddit API
+google-api-python-client  # YouTube API (optional)
+
+# NLP & Analysis
+spacy
+vaderSentiment
+
+# Backend & Storage
+fastapi
+uvicorn
+python-dotenv
+
+# Visualization & UI
+streamlit
+plotly
+
+# PDF Export
+reportlab
+markdown
+
+# Utilities
+tenacity  # Retry logic
+ratelimit
+requests
+aiohttp
+python-dateutil
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
