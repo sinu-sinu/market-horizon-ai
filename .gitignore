@@ -1,4 +1,35 @@
-/plan/
-.env 
-/venv/
+# Environment and virtualenv
+.env
+.venv/
+venv/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# IDE / Editor files
+.vscode/
+.idea/
+
+# Test and coverage data
 /tests/
+*.cover
+.coverage
+htmlcov/
+
+# Data / local databases
+/data/cache.db
+data/faiss_index/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+tmp/
+
+# additional files
+/plan/
