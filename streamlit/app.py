@@ -17,6 +17,7 @@ from core.orchestrator import AgentOrchestrator
 from utils.chart_generator import generate_positioning_map
 from utils.report_generator import generate_markdown_report
 from utils.query_history import QueryHistory
+from utils.cache_manager import CacheManager
 
 
 # -------------------- PAGE CONFIG --------------------
@@ -146,8 +147,14 @@ def display_results(result: dict):
             for rec in recommendations:
                 try:
                     topic = rec.get("topic", "Untitled")
-                    priority = rec.get("priority", "medium").capitalize()
-                    st.write(f"- **{topic}** ({priority} priority)")
+                    priority = rec.get("priority", "medium").lower()
+                    opportunity = rec.get("opportunity_score", 0)
+                    format_rec = rec.get("recommended_format", "")
+
+                    # Minimal single-line display
+                    priority_icon = "●" if priority == "high" else "○"
+                    format_str = f" • {format_rec}" if format_rec else ""
+                    st.write(f"{priority_icon} **{topic}** | Score: {opportunity:.1f}/10{format_str}")
                 except (ValueError, TypeError):
                     st.write(f"- {rec}")
         else:
@@ -227,6 +234,118 @@ with st.sidebar:
                     load_result_from_history(query_id)
     else:
         st.info("No queries yet.")
+
+    st.markdown("---")
+
+    # ---- CACHE MANAGEMENT ----
+    st.subheader("Cache Management")
+    with st.expander(" Cache Tools", expanded=False):
+        orchestrator = AgentOrchestrator()
+        cache_tabs = st.tabs(["Stats", "Clear", "Advanced"])
+
+        # --- TAB 1: STATS ---
+        with cache_tabs[0]:
+            if st.button(" View Cache Statistics", key="view_cache_stats", use_container_width=True):
+                stats = orchestrator.get_cache_stats()
+
+                # Display metrics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Hit Rate", stats.get("hit_rate", "N/A"))
+                with col2:
+                    st.metric("Cache Size", f"{stats.get('total_size_mb', 0):.2f} MB")
+                with col3:
+                    st.metric("Entries", stats.get("total_entries_valid", 0))
+
+                # Display by type breakdown
+                if "by_type" in stats and stats["by_type"]:
+                    st.write("**Breakdown by Type:**")
+                    for item in stats["by_type"]:
+                        st.write(f"- {item['type']}: {item['count']} entries ({item['hits']} hits)")
+
+                st.info(f"Cache database: `data/cache.db`")
+
+        # --- TAB 2: CLEAR OPTIONS ---
+        with cache_tabs[1]:
+            st.write("**Clear Cache By:**")
+
+            # Clear All
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write("Clear all cached data")
+            with col2:
+                if st.button("Clear All", key="clear_all_cache", use_container_width=True):
+                    orchestrator.clear_cache_all()
+                    st.success("✅ All cache cleared!")
+                    st.rerun()
+
+            st.markdown("---")
+
+            # Clear by Type
+            st.write("Clear by cache type:")
+            cache_types = [
+                CacheManager.CACHE_TYPE_WEB,
+                CacheManager.CACHE_TYPE_TRENDS,
+                CacheManager.CACHE_TYPE_REDDIT,
+                CacheManager.CACHE_TYPE_ANALYSIS,
+                CacheManager.CACHE_TYPE_STRATEGY,
+                CacheManager.CACHE_TYPE_QUALITY,
+            ]
+            selected_type = st.selectbox("Select cache type:", cache_types, key="cache_type_select")
+
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"Clear `{selected_type}` cache")
+            with col2:
+                if st.button("Clear Type", key="clear_type_cache", use_container_width=True):
+                    deleted = orchestrator.clear_cache_by_type(selected_type)
+                    st.success(f"✅ Deleted {deleted} entries of type '{selected_type}'")
+                    st.rerun()
+
+            st.markdown("---")
+
+            # Clear by Query
+            st.write("Clear by query:")
+            query_to_clear = st.text_input("Enter query text to clear:", key="query_clear_input", placeholder="e.g., 'CRM tools'")
+
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if query_to_clear:
+                    st.write(f"Clear cache for: `{query_to_clear[:40]}...`" if len(query_to_clear) > 40 else f"Clear cache for: `{query_to_clear}`")
+            with col2:
+                if st.button(" Clear Query", key="clear_query_cache", use_container_width=True, disabled=not query_to_clear):
+                    if query_to_clear:
+                        deleted = orchestrator.clear_cache_by_query(query_to_clear)
+                        st.success(f"✅ Deleted {deleted} entries for query '{query_to_clear}'")
+                        st.rerun()
+
+        # --- TAB 3: ADVANCED ---
+        with cache_tabs[2]:
+            st.write("**Advanced Operations:**")
+
+            # Cleanup Expired
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write("Remove expired cache entries")
+            with col2:
+                if st.button("🧹 Cleanup", key="cleanup_cache", use_container_width=True):
+                    deleted = orchestrator.cleanup_cache()
+                    st.success(f"✅ Removed {deleted} expired entries")
+                    st.rerun()
+
+            st.markdown("---")
+
+            # Cache Configuration Info
+            st.write("**Cache Configuration:**")
+            st.info(
+                "**Cache Types & TTLs:**\n"
+                "- `web_search` - 7 days (search results)\n"
+                "- `google_trends` - 1 day (trending data)\n"
+                "- `reddit_discussions` - 14 days (discussions)\n"
+                "- `analysis_results` - 7 days (analysis)\n"
+                "- `strategy_results` - 7 days (strategies)\n"
+                "- `quality_results` - 7 days (quality reports)"
+            )
 
     st.markdown("---")
     st.subheader("Example Queries")
