@@ -2,6 +2,13 @@ from typing import Dict, List
 from datetime import datetime
 import logging
 
+try:
+    from fuzzywuzzy import fuzz
+    FUZZYWUZZY_AVAILABLE = True
+except ImportError:
+    FUZZYWUZZY_AVAILABLE = False
+    logging.warning("fuzzywuzzy not available, using exact string matching")
+
 logger = logging.getLogger(__name__)
 
 
@@ -122,40 +129,57 @@ class QualityAgent:
     
     def _validate_analysis(self, analysis: Dict, research_data: Dict) -> Dict:
         """
-        Validate analysis against sources
-        
+        Validate analysis against sources with fuzzy matching
+
         Args:
             analysis: Output from Analysis Agent
             research_data: Original research data
-            
+
         Returns:
             Validation result dict
         """
         competitors = analysis.get("competitors", [])
         sources = research_data.get("sources", [])
         issues = []
-        
-        # Validate competitors are mentioned in sources
+
+        # Validate competitors are mentioned in sources (with fuzzy matching)
         validated_competitors = []
+        validation_details = []
+
+        logger.debug("=" * 80)
+        logger.debug("COMPETITOR VALIDATION ANALYSIS:")
+
         for comp in competitors:
-            mentions = sum(
-                1 for s in sources 
-                if comp.lower() in (s.get("title", "") + s.get("snippet", "")).lower()
-            )
-            if mentions >= 2:  # Minimum 2 mentions
+            confidence_score = self._calculate_competitor_confidence(comp, sources)
+
+            # Very lenient threshold: score >= 1.5 (allows single good match + partial)
+            passed = confidence_score >= 1.5
+            if passed:
                 validated_competitors.append(comp)
-        
-        # More lenient: require at least 2 validated competitors instead of 3
+
+            # DEBUG: Log each competitor's validation result
+            status = "✓ PASS" if passed else "✗ FAIL"
+            validation_details.append({
+                "competitor": comp,
+                "score": confidence_score,
+                "passed": passed
+            })
+            logger.debug(f"{status} | {comp:40s} | Score: {confidence_score:.2f}")
+
+        logger.debug("=" * 80)
+        logger.info(f"Validation: {len(validated_competitors)}/{len(competitors)} competitors passed (threshold: 1.5)")
+
+        # More lenient: require at least 2 validated competitors
         competitors_valid = len(validated_competitors) >= 2
         if not competitors_valid:
             issues.append(f"Insufficient validated competitors ({len(validated_competitors)}/2 minimum)")
-        
+
         # Validate themes
         themes = analysis.get("content_themes", [])
         themes_valid = len(themes) > 0
         if not themes_valid:
             issues.append("No content themes identified")
-        
+
         return {
             "valid": competitors_valid and themes_valid,
             "validated_competitors": validated_competitors,
@@ -164,6 +188,50 @@ class QualityAgent:
             "themes_valid": themes_valid,
             "issues": issues
         }
+
+    def _calculate_competitor_confidence(self, competitor: str, sources: List[Dict]) -> float:
+        """
+        Calculate confidence score for a competitor using fuzzy matching
+
+        Args:
+            competitor: Competitor name to validate
+            sources: List of source dictionaries
+
+        Returns:
+            Confidence score (higher is better)
+        """
+        score = 0.0
+        competitor_lower = competitor.lower()
+
+        for source in sources:
+            text = (source.get("title", "") + " " + source.get("snippet", "")).lower()
+
+            if FUZZYWUZZY_AVAILABLE:
+                # Fuzzy matching - more lenient
+                # Partial ratio checks if competitor is substring with some flexibility
+                fuzzy_score = fuzz.partial_ratio(competitor_lower, text)
+
+                if fuzzy_score >= 90:  # Very high match (essentially exact)
+                    score += 1.5
+                elif fuzzy_score >= 80:  # Good match
+                    score += 1.0
+                elif fuzzy_score >= 70:  # Decent match
+                    score += 0.5
+            else:
+                # Fallback to exact substring matching if fuzzywuzzy not available
+                if competitor_lower in text:
+                    score += 1.5
+
+            # Bonus for domain name match (very high confidence)
+            domain_variants = [
+                f"{competitor_lower}.com",
+                f"{competitor_lower}.io",
+                f"{competitor_lower}.ai"
+            ]
+            if any(domain in text for domain in domain_variants):
+                score += 2.0
+
+        return score
     
     def _validate_strategy(self, strategy: Dict, analysis: Dict) -> Dict:
         """
