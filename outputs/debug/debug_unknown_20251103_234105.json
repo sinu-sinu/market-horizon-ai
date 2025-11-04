@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "query": "unknown",
+    "timestamp": "2025-11-03T23:41:05.882359",
+    "total_sources": 10
+  },
+  "sources_analysis": {
+    "count": 10,
+    "sample_titles": [
+      "Outreach: AI Revenue Workflow Platform",
+      "5 Best Email Outreach Tools (2025) – Tried & Tested",
+      "9 Best Email Outreach Tools To Get More Leads",
+      "Tools",
+      "Reply.io | AI Sales Outreach & Cold Email Platform"
+    ],
+    "sample_snippets": [
+      "Outreach helps sales, marketing, RevOps, and GTM teams win with AI-powered workflows. Discover the platform driving revenue success today.",
+      "The top 5 email outreach tools are Gmass, Apollo, Saleshandy, Lemlist, and Smartlead. Gmass and Saleshandy are recommended for beginners.",
+      "Top 9 Email Outreach Tools · 1. Saleshandy · 2. Instantly.ai · 3. Smartlead.ai · 4. Lemlist · 5. Woodpecker · 6. Apollo.io · 7. Mailshake · 8.",
+      "Tools: Sales deal health quiz, Tools: Pipeline Generation Calculator, Tools: Outreach Sales ROI Calculator, Tools: Customer churn risk quiz, Tools: AI Vendor ...",
+      "Reply.io is an AI-powered sales platform for multichannel outreach, lead generation, and AI-powered sales agents, with a unified inbox and meeting scheduling."
+    ]
+  },
+  "competitor_extraction": {
+    "llm_extracted": {
+      "count": 13,
+      "competitors": [
+        "Outreach",
+        "Gmass",
+        "Apollo",
+        "Saleshandy",
+        "Lemlist",
+        "Smartlead",
+        "Instantly.ai",
+        "Woodpecker",
+        "Apollo.io",
+        "Mailshake",
+        "Reply.io",
+        "Instantly",
+        "Dripify"
+      ]
+    },
+    "ner_extracted": {
+      "count": 0,
+      "competitors": []
+    },
+    "final_merged": {
+      "count": 13,
+      "competitors": [
+        "Outreach",
+        "Gmass",
+        "Apollo",
+        "Saleshandy",
+        "Lemlist",
+        "Smartlead",
+        "Instantly.ai",
+        "Woodpecker",
+        "Apollo.io",
+        "Mailshake",
+        "Reply.io",
+        "Instantly",
+        "Dripify"
+      ]
+    }
+  },
+  "validation": {},
+  "sources_full": [
+    {
+      "url": "https://www.outreach.io/",
+      "title": "Outreach: AI Revenue Workflow Platform",
+      "snippet": "Outreach helps sales, marketing, RevOps, and GTM teams win with AI-powered workflows. Discover the platform driving revenue success today.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.emailtooltester.com/en/blog/best-email-outreach-tools/",
+      "title": "5 Best Email Outreach Tools (2025) – Tried & Tested",
+      "snippet": "The top 5 email outreach tools are Gmass, Apollo, Saleshandy, Lemlist, and Smartlead. Gmass and Saleshandy are recommended for beginners.",
+      "date": "May 19, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.saleshandy.com/blog/email-outreach-tools/",
+      "title": "9 Best Email Outreach Tools To Get More Leads",
+      "snippet": "Top 9 Email Outreach Tools · 1. Saleshandy · 2. Instantly.ai · 3. Smartlead.ai · 4. Lemlist · 5. Woodpecker · 6. Apollo.io · 7. Mailshake · 8.",
+      "date": "Nov 30, 2024",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.outreach.io/resources/tools",
+      "title": "Tools",
+      "snippet": "Tools: Sales deal health quiz, Tools: Pipeline Generation Calculator, Tools: Outreach Sales ROI Calculator, Tools: Customer churn risk quiz, Tools: AI Vendor ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://reply.io/",
+      "title": "Reply.io | AI Sales Outreach & Cold Email Platform",
+      "snippet": "Reply.io is an AI-powered sales platform for multichannel outreach, lead generation, and AI-powered sales agents, with a unified inbox and meeting scheduling.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://instantly.ai/",
+      "title": "Instantly.ai - Sales Engagement & Lead Intelligence",
+      "snippet": "Instantly turns leads into clients with Automated Outreach, Deliverability Network, Sales Engagement, B2B Lead Database & AI-Powered CRM.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://expandi.io/",
+      "title": "#1 Linkedin Automation Tool",
+      "snippet": "Contact your sales prospects on LinkedIn and email via smart sequences. Launch your first outreach campaign in 15 minutes and see results in 24 hours.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.reddit.com/r/salestechniques/comments/1lfwbjg/best_tools_for_outreach/",
+      "title": "best tools for outreach : r/salestechniques",
+      "snippet": "The best results usually come from pairing Apollo for lead sourcing + enrichment with Smartlead or Instanly for deliverability and multichannel ...",
+      "date": "4 months ago",
+      "source_type": "web"
+    },
+    {
+      "url": "https://persana.ai/blogs/ai-outreach-tools",
+      "title": "7 Best AI Outreach Tools Sales Teams Actually Use in 2025",
+      "snippet": "Discover the best AI outreach tools to automate prospecting, personalize messaging, and boost conversions. Scale your sales efforts with AI ...",
+      "date": "Mar 15, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://dripify.com/",
+      "title": "Dripify: Sales Automation Software | Driving Growth 24/7",
+      "snippet": "Dripify automates sales on LinkedIn and email, reaching thousands of prospects monthly with personalized campaigns, and helps close deals on autopilot.",
+      "date": "Unknown",
+      "source_type": "web"
+    }
+  ]
+}

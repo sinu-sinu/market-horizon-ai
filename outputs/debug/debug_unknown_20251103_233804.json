@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "query": "unknown",
+    "timestamp": "2025-11-03T23:38:04.176700",
+    "total_sources": 10
+  },
+  "sources_analysis": {
+    "count": 10,
+    "sample_titles": [
+      "Upfluence: Influencer and Affiliate Marketing Platform with ...",
+      "Top 16 Influencer Marketing Platforms for 2025",
+      "Collabstr: Influencer Marketing Made Easy",
+      "Which platform connects brands with micro-influencers?",
+      "Aspire: Influencer Marketing Software Platform for E ..."
+    ],
+    "sample_snippets": [
+      "Upfluence is the all-in-one affiliate & influencer marketing platform now infused with Jace AI for e-commerce and direct-to-consumer brands.",
+      "16 Influencer marketing platforms and software for your brand · 1. Sprout Social Influencer Marketing (formerly Tagger) · 2. Brandwatch · 3. Upfluence · 4.",
+      "Find and hire Instagram influencers , TikTok influencers, YouTube influencers and UGC creators. World's largest influencer marketplace.",
+      "Creator.co is an all-in-one platform with multiple subscription tiers, at a low cost. Includes influencer analytics, recruitment, messaging, ...",
+      "Join today's top ecommerce brands on the leading influencer marketing platform. Build lasting relationships and drive ROI with influencer marketing."
+    ]
+  },
+  "competitor_extraction": {
+    "llm_extracted": {
+      "count": 12,
+      "competitors": [
+        "Upfluence",
+        "Jace AI",
+        "Sprout Social Influencer Marketing",
+        "Tagger",
+        "Brandwatch",
+        "Collabstr",
+        "Creator.co",
+        "Aspire",
+        "Afluencer",
+        "Influencity",
+        "Cirqle",
+        "PopularPays"
+      ]
+    },
+    "ner_extracted": {
+      "count": 0,
+      "competitors": []
+    },
+    "final_merged": {
+      "count": 12,
+      "competitors": [
+        "Upfluence",
+        "Jace AI",
+        "Sprout Social Influencer Marketing",
+        "Tagger",
+        "Brandwatch",
+        "Collabstr",
+        "Creator.co",
+        "Aspire",
+        "Afluencer",
+        "Influencity",
+        "Cirqle",
+        "PopularPays"
+      ]
+    }
+  },
+  "validation": {},
+  "sources_full": [
+    {
+      "url": "https://www.upfluence.com/",
+      "title": "Upfluence: Influencer and Affiliate Marketing Platform with ...",
+      "snippet": "Upfluence is the all-in-one affiliate & influencer marketing platform now infused with Jace AI for e-commerce and direct-to-consumer brands.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://sproutsocial.com/insights/influencer-marketing-platforms/",
+      "title": "Top 16 Influencer Marketing Platforms for 2025",
+      "snippet": "16 Influencer marketing platforms and software for your brand · 1. Sprout Social Influencer Marketing (formerly Tagger) · 2. Brandwatch · 3. Upfluence · 4.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://collabstr.com/",
+      "title": "Collabstr: Influencer Marketing Made Easy",
+      "snippet": "Find and hire Instagram influencers , TikTok influencers, YouTube influencers and UGC creators. World's largest influencer marketplace.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.reddit.com/r/influencermarketing/comments/1bstcz1/which_platform_connects_brands_with/",
+      "title": "Which platform connects brands with micro-influencers?",
+      "snippet": "Creator.co is an all-in-one platform with multiple subscription tiers, at a low cost. Includes influencer analytics, recruitment, messaging, ...",
+      "date": "1 year ago",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.aspire.io/",
+      "title": "Aspire: Influencer Marketing Software Platform for E ...",
+      "snippet": "Join today's top ecommerce brands on the leading influencer marketing platform. Build lasting relationships and drive ROI with influencer marketing.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://afluencer.com/",
+      "title": "Afluencer: Free Influencer Marketing Platform",
+      "snippet": "Voted the best free influencer marketing platform. And top small business solution, too! Free sign up for Brands, Influencers and Creators.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://influencity.com/",
+      "title": "Influencity: The Complete Influencer Marketing Platform",
+      "snippet": "Streamline your social media and influencer marketing with Influencity, our all-in-one platform. Manage, analyze, and optimize your campaigns for maximum ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://thecirqle.com/influencer-marketing-platform",
+      "title": "Influencer Marketing Platform Overview",
+      "snippet": "The Cirqle Platform redefines the influencer marketing landscape with its advanced, AI-driven features. Offering seamless integration, intuitive design, and ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://popularpays.com/",
+      "title": "Content Creation & Influencer Marketing Platform | PopularPays",
+      "snippet": "Creative content designed to highlight your brand. Work with top digital creators who will generate inspiring content to elevate your social pages.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://grin.co/",
+      "title": "GRIN: The #1 Influencer Marketing Software",
+      "snippet": "GRIN is the last and only tool you need for influencer marketing. It connects with your existing stack and becomes your full creator marketing engine.",
+      "date": "Unknown",
+      "source_type": "web"
+    }
+  ]
+}

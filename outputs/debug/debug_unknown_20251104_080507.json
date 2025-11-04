@@ -1,0 +1,143 @@
+{
+  "metadata": {
+    "query": "unknown",
+    "timestamp": "2025-11-04T08:05:07.979517",
+    "total_sources": 10
+  },
+  "sources_analysis": {
+    "count": 10,
+    "sample_titles": [
+      "Best LLMs for coding: developer favorites",
+      "Best Vibe Code tools that are free and use your own local ...",
+      "AnythingLLM | The all-in-one AI application for everyone",
+      "Shubhamsaboo/awesome-llm-apps",
+      "10 Best Vibe Coding Tools: LLM-Powered ..."
+    ],
+    "sample_snippets": [
+      "Best LLMs for coding in 2025: Claude Sonnet 4.5, GPT-5, GLM-4.6, Gemini 2.5 Pro, and DeepSeek compared. Real benchmarks, pricing, and developer favorites.",
+      "Hey, if you're looking for vibe coding tools, check out Blink.new. You just tell it what you want and it spins up a full web or mobile app ...",
+      "AnythingLLM is the AI application you've been seeking. Use any LLM to chat with your documents, enhance your productivity, and run the latest ...",
+      "Why Awesome LLM Apps? Discover practical and creative ways LLMs can be applied across different domains, from code repositories to email inboxes and more.",
+      "10 best vibe coding tools · 1. Lovable · 2. Github Copilot · 3. Claude code · 4. Windsurf · 5. Replit · 6. OpenAI Codex · 7. Cursor · 8. Bolt."
+    ]
+  },
+  "competitor_extraction": {
+    "llm_extracted": {
+      "count": 15,
+      "competitors": [
+        "Claude Sonnet 4.5",
+        "GPT-5",
+        "GLM-4.6",
+        "Gemini 2.5 Pro",
+        "DeepSeek",
+        "Blink.new",
+        "AnythingLLM",
+        "Lovable",
+        "Github Copilot",
+        "Claude code",
+        "Windsurf",
+        "Replit",
+        "OpenAI Codex",
+        "Cursor",
+        "Bolt"
+      ]
+    },
+    "ner_extracted": {
+      "count": 0,
+      "competitors": []
+    },
+    "final_merged": {
+      "count": 15,
+      "competitors": [
+        "Claude Sonnet 4.5",
+        "GPT-5",
+        "GLM-4.6",
+        "Gemini 2.5 Pro",
+        "DeepSeek",
+        "Blink.new",
+        "AnythingLLM",
+        "Lovable",
+        "Github Copilot",
+        "Claude code",
+        "Windsurf",
+        "Replit",
+        "OpenAI Codex",
+        "Cursor",
+        "Bolt"
+      ]
+    }
+  },
+  "validation": {},
+  "sources_full": [
+    {
+      "url": "https://codingscape.com/blog/best-llms-for-coding-developer-favorites",
+      "title": "Best LLMs for coding: developer favorites",
+      "snippet": "Best LLMs for coding in 2025: Claude Sonnet 4.5, GPT-5, GLM-4.6, Gemini 2.5 Pro, and DeepSeek compared. Real benchmarks, pricing, and developer favorites.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.reddit.com/r/LocalLLaMA/comments/1mg8f1r/best_vibe_code_tools_that_are_free_and_use_your/",
+      "title": "Best Vibe Code tools that are free and use your own local ...",
+      "snippet": "Hey, if you're looking for vibe coding tools, check out Blink.new. You just tell it what you want and it spins up a full web or mobile app ...",
+      "date": "3 months ago",
+      "source_type": "web"
+    },
+    {
+      "url": "https://anythingllm.com/",
+      "title": "AnythingLLM | The all-in-one AI application for everyone",
+      "snippet": "AnythingLLM is the AI application you've been seeking. Use any LLM to chat with your documents, enhance your productivity, and run the latest ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://github.com/Shubhamsaboo/awesome-llm-apps",
+      "title": "Shubhamsaboo/awesome-llm-apps",
+      "snippet": "Why Awesome LLM Apps? Discover practical and creative ways LLMs can be applied across different domains, from code repositories to email inboxes and more.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.digitalocean.com/resources/articles/vibe-coding-tools",
+      "title": "10 Best Vibe Coding Tools: LLM-Powered ...",
+      "snippet": "10 best vibe coding tools · 1. Lovable · 2. Github Copilot · 3. Claude code · 4. Windsurf · 5. Replit · 6. OpenAI Codex · 7. Cursor · 8. Bolt.",
+      "date": "Jun 17, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://blog.n8n.io/best-llm-for-coding/",
+      "title": "The 20 best LLMs for coding (+ free workflow templates)",
+      "snippet": "Explore the top 20 LLMs for coding and get free n8n workflow templates to integrate AI into your development process.",
+      "date": "Feb 11, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.legitsecurity.com/aspm-knowledge-base/best-vibe-coding-tools",
+      "title": "6 Best Vibe Coding Tools on the Market: Unlocking LLM ...",
+      "snippet": "6 Best Vibe Coding Tools · 1. Claude Code · 2. Cursor · 3. OpenAI Codex · 4. GitHub Copilot · 5. Replit · 6. Gemini Code Assist.",
+      "date": "Oct 6, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.openxcell.com/blog/best-llm-for-coding/",
+      "title": "Best LLM for Coding: Paid & Open Source Picks",
+      "snippet": "Various best LLMs for coding have been released for debugging complex systems, detecting bugs, auto-generating repetitive code, and more.",
+      "date": "Jul 4, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://simonwillison.net/2025/Mar/11/using-llms-for-code/",
+      "title": "Here's how I use LLMs to help me write code",
+      "snippet": "Using LLMs to write code is difficult and unintuitive. It takes significant effort to figure out the sharp and soft edges of using them in this way.",
+      "date": "Mar 11, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://cursor.com/",
+      "title": "Cursor: The best way to code with AI",
+      "snippet": "The best LLM applications have an autonomy slider: you control how much independence to give the AI. In Cursor, you can do Tab completion, Cmd+K for ...",
+      "date": "Unknown",
+      "source_type": "web"
+    }
+  ]
+}
