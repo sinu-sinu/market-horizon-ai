@@ -158,7 +158,7 @@ class QualityAgent:
                 validated_competitors.append(comp)
 
             # DEBUG: Log each competitor's validation result
-            status = "✓ PASS" if passed else "✗ FAIL"
+            status = "PASS" if passed else "FAIL"
             validation_details.append({
                 "competitor": comp,
                 "score": confidence_score,

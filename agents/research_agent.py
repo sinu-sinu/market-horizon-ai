@@ -1,10 +1,13 @@
 import requests
+import aiohttp
+import asyncio
 from pytrends.request import TrendReq
 import praw
 from typing import Dict, List
 from core.config import config
 from utils.error_handler import retry_on_failure
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +26,15 @@ class ResearchAgent:
         """Initialize API clients"""
         # Serper.dev API
         self.serper_api_key = config.SERPER_API_KEY
-        
+
         # Google Trends
         self.trends_client = TrendReq(hl='en-US', tz=360)
-        
+
         # Reddit API - Store credentials as attributes for testing/debugging
         self.reddit_client_id = config.REDDIT_CLIENT_ID
         self.reddit_client_secret = config.REDDIT_CLIENT_SECRET
         self.reddit_user_agent = config.REDDIT_USER_AGENT
-        
+
         if config.REDDIT_CLIENT_ID:
             try:
                 self.reddit_client = praw.Reddit(
@@ -46,25 +49,33 @@ class ResearchAgent:
         else:
             self.reddit_client = None
             logger.info("Reddit API credentials not configured")
+
+        # Thread pool executor for running non-async libraries (pytrends, praw)
+        self.executor = ThreadPoolExecutor(max_workers=3)
     
     @retry_on_failure
     def run(self, query: str) -> Dict:
         """
-        Execute research pipeline
-        
+        Execute research pipeline with parallel API calls
+
         Args:
             query: User's search query
-            
+
         Returns:
             Dict containing sources, trends, discussions, and metadata
         """
         logger.info(f"Research Agent: Processing query '{query}'")
-        
-        # Gather data from multiple sources
-        web_results = self._search_web(query)
-        trends_data = self._get_trends(query)
-        reddit_data = self._search_reddit(query)
-        
+
+        # Run async operations
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            web_results, trends_data, reddit_data = loop.run_until_complete(
+                self._run_parallel(query)
+            )
+        finally:
+            loop.close()
+
         # Structure output
         output = {
             "sources": web_results,
@@ -79,17 +90,48 @@ class ResearchAgent:
                 }
             }
         }
-        
+
         logger.info(f"Research Agent: Found {len(web_results)} web sources, {len(reddit_data)} discussions")
         return output
-    
-    def _search_web(self, query: str) -> List[Dict]:
+
+    async def _run_parallel(self, query: str) -> tuple:
         """
-        Search web via Serper.dev API
-        
+        Run all three API calls in parallel
+
+        Args:
+            query: User's search query
+
+        Returns:
+            Tuple of (web_results, trends_data, reddit_data)
+        """
+        # Execute all three API calls concurrently
+        web_results, trends_data, reddit_data = await asyncio.gather(
+            self._search_web(query),
+            self._get_trends(query),
+            self._search_reddit(query),
+            return_exceptions=True
+        )
+
+        # Handle any exceptions in results
+        if isinstance(web_results, Exception):
+            logger.error(f"Web search error: {web_results}")
+            web_results = []
+        if isinstance(trends_data, Exception):
+            logger.error(f"Trends error: {trends_data}")
+            trends_data = {}
+        if isinstance(reddit_data, Exception):
+            logger.error(f"Reddit error: {reddit_data}")
+            reddit_data = []
+
+        return web_results, trends_data, reddit_data
+    
+    async def _search_web(self, query: str) -> List[Dict]:
+        """
+        Search web via Serper.dev API (async)
+
         Args:
             query: Search query
-            
+
         Returns:
             List of web sources with title, snippet, URL, date
         """
@@ -106,13 +148,14 @@ class ResearchAgent:
                 "gl": "us",  # Country: US
                 "hl": "en"   # Language: English
             }
-            
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            response.raise_for_status()
-            results = response.json()
-            
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                    response.raise_for_status()
+                    results = await response.json()
+
             sources = []
-            
+
             # Parse organic results (Serper.dev uses "organic" not "organic_results")
             for item in results.get("organic", []):
                 sources.append({
@@ -122,21 +165,34 @@ class ResearchAgent:
                     "date": item.get("date", "Unknown"),
                     "source_type": "web"
                 })
-            
+
             logger.info(f"Serper.dev API: Retrieved {len(sources)} web results")
             return sources
-            
+
         except Exception as e:
             logger.error(f"Serper.dev API error: {e}", exc_info=True)
             return []
     
-    def _get_trends(self, query: str) -> Dict:
+    async def _get_trends(self, query: str) -> Dict:
         """
-        Get Google Trends data
-        
+        Get Google Trends data (async via thread pool)
+
         Args:
             query: Search term
-            
+
+        Returns:
+            Dict with trend data and average interest
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self.executor, self._get_trends_sync, query)
+
+    def _get_trends_sync(self, query: str) -> Dict:
+        """
+        Synchronous Google Trends data fetching (runs in thread pool)
+
+        Args:
+            query: Search term
+
         Returns:
             Dict with trend data and average interest
         """
@@ -144,28 +200,28 @@ class ResearchAgent:
             # Build payload for last 3 months
             self.trends_client.build_payload([query], timeframe='today 3-m')
             interest_over_time = self.trends_client.interest_over_time()
-            
+
             if not interest_over_time.empty:
                 # Calculate average interest
                 avg_interest = float(interest_over_time[query].mean())
-                
+
                 # Convert to dict for JSON serialization
                 trend_dict = {}
                 for date, value in interest_over_time[query].items():
                     trend_dict[date.strftime('%Y-%m-%d')] = int(value)
-                
+
                 result = {
                     "query": query,
                     "trend_data": trend_dict,
                     "average_interest": avg_interest
                 }
-                
+
                 logger.info(f"Google Trends: Average interest {avg_interest:.1f}/100")
                 return result
             else:
                 logger.warning("Google Trends: No data available")
                 return {}
-                
+
         except Exception as e:
             error_str = str(e)
             # Handle rate limiting (429 errors) gracefully
@@ -175,21 +231,35 @@ class ResearchAgent:
                 logger.warning(f"Trends API error: {e}")
             return {}
     
-    def _search_reddit(self, query: str, limit: int = 10) -> List[Dict]:
+    async def _search_reddit(self, query: str, limit: int = 10) -> List[Dict]:
         """
-        Search Reddit discussions
-        
+        Search Reddit discussions (async via thread pool)
+
         Args:
             query: Search query
             limit: Maximum number of results
-            
+
+        Returns:
+            List of Reddit posts with metadata
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self.executor, self._search_reddit_sync, query, limit)
+
+    def _search_reddit_sync(self, query: str, limit: int = 10) -> List[Dict]:
+        """
+        Synchronous Reddit search (runs in thread pool)
+
+        Args:
+            query: Search query
+            limit: Maximum number of results
+
         Returns:
             List of Reddit posts with metadata
         """
         if not self.reddit_client:
             logger.debug("Reddit API not configured, skipping")
             return []
-        
+
         discussions = []
         try:
             # Search across all subreddits
@@ -203,12 +273,12 @@ class ResearchAgent:
                     "subreddit": str(submission.subreddit),
                     "source_type": "reddit"
                 })
-            
+
             logger.info(f"Reddit API: Retrieved {len(discussions)} discussions")
-            
+
         except Exception as e:
             logger.warning(f"Reddit API error: {e}")
-        
+
         return discussions
 
 
