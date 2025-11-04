@@ -60,13 +60,32 @@ class QueryHistory:
     def get_query_by_id(self, query_id: int) -> dict | None:
         cursor = self.conn.execute(
             """
-            SELECT result_json FROM queries WHERE id = ?
+            SELECT query, result_json FROM queries WHERE id = ?
             """,
             (query_id,),
         )
         row = cursor.fetchone()
         if row:
-            return json.loads(row[0])
+            result = json.loads(row[1])
+            # Add the original query text to the result
+            result["query_text"] = row[0]
+            return result
+        return None
+    
+    def get_latest_result(self) -> dict | None:
+        """Get the most recent query result"""
+        cursor = self.conn.execute(
+            """
+            SELECT query, result_json FROM queries 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        if row:
+            result = json.loads(row[1])
+            result["query_text"] = row[0]
+            return result
         return None
 
 
