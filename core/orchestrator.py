@@ -56,13 +56,13 @@ class AgentOrchestrator:
         """Execute Research Agent"""
         state["current_agent"] = "research"
         logger.info(f"Research Agent: Processing query '{state['query']}'")
-        
+
         try:
             result = self.research_agent.run(state["query"])
             state["research_data"] = result
             state["api_calls"] += 1
             logger.info("Research Agent: Completed successfully")
-            
+
         except Exception as e:
             logger.error(f"Research agent failed: {e}", exc_info=True)
             state["errors"].append({
@@ -71,20 +71,20 @@ class AgentOrchestrator:
                 "timestamp": datetime.now().isoformat(),
                 "fallback_used": False
             })
-        
+
         return state
     
     def _run_analysis(self, state: AgentState) -> AgentState:
         """Execute Analysis Agent"""
         state["current_agent"] = "analysis"
         logger.info("Analysis Agent: Processing research data")
-        
+
         try:
             result = self.analysis_agent.run(state["research_data"])
             state["analysis_insights"] = result
             state["api_calls"] += 1
             logger.info("Analysis Agent: Completed successfully")
-            
+
         except Exception as e:
             logger.error(f"Analysis agent failed: {e}", exc_info=True)
             state["errors"].append({
@@ -93,20 +93,20 @@ class AgentOrchestrator:
                 "timestamp": datetime.now().isoformat(),
                 "fallback_used": False
             })
-        
+
         return state
     
     def _run_strategy(self, state: AgentState) -> AgentState:
         """Execute Strategy Agent"""
         state["current_agent"] = "strategy"
         logger.info("Strategy Agent: Generating recommendations")
-        
+
         try:
             result = self.strategy_agent.run(state["analysis_insights"])
             state["strategy_recommendations"] = result
             state["api_calls"] += 1
             logger.info("Strategy Agent: Completed successfully")
-            
+
         except Exception as e:
             logger.error(f"Strategy agent failed: {e}", exc_info=True)
             state["errors"].append({
@@ -115,19 +115,19 @@ class AgentOrchestrator:
                 "timestamp": datetime.now().isoformat(),
                 "fallback_used": False
             })
-        
+
         return state
     
     def _run_quality(self, state: AgentState) -> AgentState:
         """Execute Quality Agent"""
         state["current_agent"] = "quality"
         logger.info("Quality Agent: Validating outputs")
-        
+
         try:
             result = self.quality_agent.run(state)
             state["quality_report"] = result
             logger.info("Quality Agent: Completed successfully")
-            
+
         except Exception as e:
             logger.error(f"Quality agent failed: {e}", exc_info=True)
             state["errors"].append({
@@ -136,22 +136,22 @@ class AgentOrchestrator:
                 "timestamp": datetime.now().isoformat(),
                 "fallback_used": False
             })
-        
+
         return state
     
     def run(self, query: str, parameters: dict = None) -> dict:
         """
         Execute full pipeline
-        
+
         Args:
             query: User's market research query
             parameters: Optional parameters for customization
-            
+
         Returns:
             Final quality report with all insights
         """
         logger.info(f"Orchestrator: Starting pipeline for query: '{query}'")
-        
+
         # Initialize state
         initial_state: AgentState = {
             "query": query,
@@ -167,10 +167,10 @@ class AgentOrchestrator:
             "total_tokens": 0,
             "api_calls": 0
         }
-        
+
         # Execute workflow
         final_state = self.workflow.invoke(initial_state)
-        
+
         # Return compiled output
         return self._compile_output(final_state)
     
