@@ -1,5 +1,6 @@
 from langgraph.graph import StateGraph, END
 from core.state import AgentState
+from utils.cache_manager import get_cache_manager
 from datetime import datetime
 import logging
 
@@ -20,16 +21,20 @@ class AgentOrchestrator:
         from agents.analysis_agent import AnalysisAgent
         from agents.strategy_agent import StrategyAgent
         from agents.quality_agent import QualityAgent
-        
+
+        # Initialize cache manager
+        self.cache = get_cache_manager()
+
         # Initialize all agents
         self.research_agent = ResearchAgent()
         self.analysis_agent = AnalysisAgent()
         self.strategy_agent = StrategyAgent()
         self.quality_agent = QualityAgent()
-        
+
         self.workflow = self._build_workflow()
-        
+
         logger.info("AgentOrchestrator initialized with all 4 agents")
+        logger.info(f"Cache manager initialized with database at data/cache.db")
     
     def _build_workflow(self) -> StateGraph:
         """Build LangGraph workflow with StateGraph API (LangGraph 1.0.2)"""
@@ -179,10 +184,10 @@ class AgentOrchestrator:
         # If quality report exists, return it
         if state.get("quality_report"):
             return state["quality_report"]
-        
+
         # Fallback: construct basic report
         processing_time = (datetime.now() - state["start_time"]).total_seconds()
-        
+
         return {
             "report_metadata": {
                 "query": state["query"],
@@ -208,6 +213,75 @@ class AgentOrchestrator:
             ],
             "source_attribution": {}
         }
+
+    # ==================== CACHE MANAGEMENT ====================
+
+    def get_cache_stats(self) -> dict:
+        """
+        Get cache statistics
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        return self.cache.get_stats()
+
+    def print_cache_stats(self):
+        """Print formatted cache statistics"""
+        self.cache.print_stats()
+
+    def clear_cache_all(self, force: bool = False) -> int:
+        """
+        Clear entire cache
+
+        Args:
+            force: Skip confirmation
+
+        Returns:
+            Number of entries deleted
+        """
+        logger.warning("Clearing entire cache...")
+        deleted = self.cache.clear_all()
+        logger.info(f"Cleared {deleted} cache entries")
+        return deleted
+
+    def clear_cache_by_type(self, cache_type: str) -> int:
+        """
+        Clear cache by type
+
+        Args:
+            cache_type: Type of cache to clear
+
+        Returns:
+            Number of entries deleted
+        """
+        deleted = self.cache.delete_by_type(cache_type)
+        logger.info(f"Cleared {deleted} cache entries of type '{cache_type}'")
+        return deleted
+
+    def clear_cache_by_query(self, query: str) -> int:
+        """
+        Clear cache for specific query
+
+        Args:
+            query: Query to clear
+
+        Returns:
+            Number of entries deleted
+        """
+        deleted = self.cache.delete_by_query(query)
+        logger.info(f"Cleared {deleted} cache entries for query '{query}'")
+        return deleted
+
+    def cleanup_cache(self) -> int:
+        """
+        Remove expired cache entries
+
+        Returns:
+            Number of entries deleted
+        """
+        deleted = self.cache.cleanup_expired()
+        logger.info(f"Cache cleanup removed {deleted} expired entries")
+        return deleted
 
 
 # CLI entry point for testing
