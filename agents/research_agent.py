@@ -6,6 +6,7 @@ import praw
 from typing import Dict, List
 from core.config import config
 from utils.error_handler import retry_on_failure
+from utils.cache_manager import get_cache_manager, CacheManager
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
@@ -23,7 +24,10 @@ class ResearchAgent:
     """
     
     def __init__(self):
-        """Initialize API clients"""
+        """Initialize API clients and cache manager"""
+        # Initialize cache manager
+        self.cache = get_cache_manager()
+
         # Serper.dev API
         self.serper_api_key = config.SERPER_API_KEY
 
@@ -56,7 +60,7 @@ class ResearchAgent:
     @retry_on_failure
     def run(self, query: str) -> Dict:
         """
-        Execute research pipeline with parallel API calls
+        Execute research pipeline with parallel API calls and caching
 
         Args:
             query: User's search query
@@ -65,6 +69,13 @@ class ResearchAgent:
             Dict containing sources, trends, discussions, and metadata
         """
         logger.info(f"Research Agent: Processing query '{query}'")
+
+        # Check cache first
+        cache_key = self.cache._make_key("research", query=query)
+        cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_WEB)
+        if cached_result:
+            logger.info(f"Research Agent: CACHE HIT for query '{query}'")
+            return cached_result
 
         # Run async operations
         try:
@@ -87,9 +98,19 @@ class ResearchAgent:
                     "web": len(web_results),
                     "trends": 1 if trends_data else 0,
                     "reddit": len(reddit_data)
-                }
+                },
+                "from_cache": False
             }
         }
+
+        # Cache the result
+        self.cache.set(
+            cache_key,
+            output,
+            CacheManager.CACHE_TYPE_WEB,
+            query=query,
+            metadata={"sources": len(web_results), "discussions": len(reddit_data)}
+        )
 
         logger.info(f"Research Agent: Found {len(web_results)} web sources, {len(reddit_data)} discussions")
         return output
@@ -127,7 +148,7 @@ class ResearchAgent:
     
     async def _search_web(self, query: str) -> List[Dict]:
         """
-        Search web via Serper.dev API (async)
+        Search web via Serper.dev API (async) with caching
 
         Args:
             query: Search query
@@ -136,6 +157,13 @@ class ResearchAgent:
             List of web sources with title, snippet, URL, date
         """
         try:
+            # Check cache first
+            cache_key = self.cache._make_key("web_search", query=query)
+            cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_WEB)
+            if cached_result:
+                logger.debug(f"Web search CACHE HIT for query '{query}'")
+                return cached_result
+
             # Serper.dev API endpoint
             url = "https://google.serper.dev/search"
             headers = {
@@ -166,6 +194,15 @@ class ResearchAgent:
                     "source_type": "web"
                 })
 
+            # Cache the result
+            self.cache.set(
+                cache_key,
+                sources,
+                CacheManager.CACHE_TYPE_WEB,
+                ttl_hours=168,  # 7 days
+                query=query
+            )
+
             logger.info(f"Serper.dev API: Retrieved {len(sources)} web results")
             return sources
 
@@ -188,7 +225,7 @@ class ResearchAgent:
 
     def _get_trends_sync(self, query: str) -> Dict:
         """
-        Synchronous Google Trends data fetching (runs in thread pool)
+        Synchronous Google Trends data fetching (runs in thread pool) with caching
 
         Args:
             query: Search term
@@ -197,6 +234,13 @@ class ResearchAgent:
             Dict with trend data and average interest
         """
         try:
+            # Check cache first
+            cache_key = self.cache._make_key("trends", query=query)
+            cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_TRENDS)
+            if cached_result:
+                logger.debug(f"Trends CACHE HIT for query '{query}'")
+                return cached_result
+
             # Build payload for last 3 months
             self.trends_client.build_payload([query], timeframe='today 3-m')
             interest_over_time = self.trends_client.interest_over_time()
@@ -215,6 +259,15 @@ class ResearchAgent:
                     "trend_data": trend_dict,
                     "average_interest": avg_interest
                 }
+
+                # Cache the result
+                self.cache.set(
+                    cache_key,
+                    result,
+                    CacheManager.CACHE_TYPE_TRENDS,
+                    ttl_hours=24,  # 1 day
+                    query=query
+                )
 
                 logger.info(f"Google Trends: Average interest {avg_interest:.1f}/100")
                 return result
@@ -247,7 +300,7 @@ class ResearchAgent:
 
     def _search_reddit_sync(self, query: str, limit: int = 10) -> List[Dict]:
         """
-        Synchronous Reddit search (runs in thread pool)
+        Synchronous Reddit search (runs in thread pool) with caching
 
         Args:
             query: Search query
@@ -260,8 +313,15 @@ class ResearchAgent:
             logger.debug("Reddit API not configured, skipping")
             return []
 
-        discussions = []
         try:
+            # Check cache first
+            cache_key = self.cache._make_key("reddit_search", query=query, limit=limit)
+            cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_REDDIT)
+            if cached_result:
+                logger.debug(f"Reddit search CACHE HIT for query '{query}'")
+                return cached_result
+
+            discussions = []
             # Search across all subreddits
             for submission in self.reddit_client.subreddit("all").search(query, limit=limit, time_filter='month'):
                 discussions.append({
@@ -274,12 +334,21 @@ class ResearchAgent:
                     "source_type": "reddit"
                 })
 
+            # Cache the result
+            self.cache.set(
+                cache_key,
+                discussions,
+                CacheManager.CACHE_TYPE_REDDIT,
+                ttl_hours=336,  # 14 days
+                query=query
+            )
+
             logger.info(f"Reddit API: Retrieved {len(discussions)} discussions")
+            return discussions
 
         except Exception as e:
             logger.warning(f"Reddit API error: {e}")
-
-        return discussions
+            return []
 
 
 # CLI testing
