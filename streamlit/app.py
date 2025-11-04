@@ -2,7 +2,10 @@ import os
 import sys
 from datetime import datetime
 import time
+import logging
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 # Ensure project root is importable when running from streamlit/
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,13 +26,44 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Scroll to top on every page load
+st.markdown(
+    """
+    <style>
+        /* Smooth scroll behavior */
+        html, body {
+            scroll-behavior: smooth;
+        }
+        .stApp {
+            scroll-behavior: smooth;
+        }
+        /* Anchor for scroll to top */
+        #page-top {
+            position: fixed;
+            top: 0;
+        }
+    </style>
+
+    <script>
+        // Force scroll to top on page load
+        setTimeout(function() {
+            window.scrollTo(0, 0);
+        }, 0);
+    </script>
+
+    <div id="page-top"></div>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("Market Horizon AI")
 st.caption("AI-Powered Competitive Intelligence Platform")
 
 # -------------------- INITIALIZE --------------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Always start with fresh messages on each page load
+st.session_state.messages = []
 
+# Don't auto-load previous results - start fresh
 if "current_result" not in st.session_state:
     st.session_state.current_result = None
 
@@ -39,122 +73,128 @@ if "selected_query_id" not in st.session_state:
 history = QueryHistory()
 
 
-# ---- Utility: Add fallback get_latest_result() ----
-def get_latest_result_fallback():
-    """Safely get the most recent saved result."""
-    try:
-        recent = history.get_recent_queries(limit=1)
-        if recent:
-            query_id = recent[0][0]
-            result = history.get_query_by_id(query_id)
-            return result
-    except Exception:
-        return None
-    return None
-
-
-# On first load, fetch latest result if available
-if "initialized" not in st.session_state:
-    st.session_state.initialized = True
-    latest_result = get_latest_result_fallback()
-    if latest_result:
-        st.session_state.current_result = latest_result
-
-
 # -------------------- DISPLAY RESULTS --------------------
 def display_results(result: dict):
     st.success("Analysis Complete")
 
-    # --- Report Metadata ---
-    st.subheader("Report Metadata")
-    col1, col2, col3 = st.columns(3)
-    confidence = result["report_metadata"]["confidence_score"]
-    with col1:
-        st.metric("Confidence Score", f"{confidence:.2f}")
-    with col2:
-        st.metric("Total Sources", result["report_metadata"]["total_sources"])
-    with col3:
-        st.metric("Processing Time (s)", result["report_metadata"]["processing_time_seconds"])
+    try:
+        # --- Report Metadata ---
+        st.subheader("Report Metadata")
+        col1, col2, col3 = st.columns(3)
 
-    st.markdown("---")
+        report_meta = result.get("report_metadata", {})
+        confidence = report_meta.get("confidence_score", 0.0)
+        total_sources = report_meta.get("total_sources", 0)
+        processing_time = report_meta.get("processing_time_seconds", 0)
 
-    # --- Competitors ---
-    st.subheader("Identified Competitors")
-    competitors = result["validated_insights"].get("competitors", [])
-    if competitors:
-        st.write(", ".join(competitors))
-        st.caption(f"{len(competitors)} competitors identified")
-    else:
-        st.info("No competitors identified.")
-
-    st.markdown("---")
-
-    # --- Content Themes ---
-    st.subheader("Content Themes")
-    themes = result["validated_insights"].get("content_themes", [])
-    if themes:
-        for theme in themes:
-            name = theme.get("theme", "Unknown")
-            freq = theme.get("frequency", 0)
-            sentiment = theme.get("sentiment", 0)
-            st.write(f"- **{name}** | Mentions: {freq} | Sentiment: {sentiment:.2f}")
-    else:
-        st.info("No themes available.")
-
-    st.markdown("---")
-
-    # --- Positioning Map ---
-    st.subheader("Competitive Positioning Map")
-    positioning_map = result["validated_insights"].get("positioning_map", {})
-    if positioning_map:
-        fig = generate_positioning_map(positioning_map)
-        st.plotly_chart(fig, width="stretch")
-    else:
-        st.info("Positioning map not available.")
-
-    st.markdown("---")
-
-    # --- Recommendations ---
-    st.subheader("Content Recommendations")
-    recommendations = result["validated_insights"].get("content_recommendations", [])
-    if recommendations:
-        for rec in recommendations:
-            topic = rec.get("topic", "Untitled")
-            priority = rec.get("priority", "medium").capitalize()
-            st.write(f"- **{topic}** ({priority} priority)")
-    else:
-        st.info("No recommendations available.")
-
-    st.markdown("---")
-
-    # --- Quality Flags ---
-    if result.get("quality_flags"):
-        st.subheader("Quality Insights")
-        for flag in result["quality_flags"]:
-            flag_type = flag.get("type", "info")
-            message = flag.get("message", "")
-            agent = flag.get("agent", "unknown")
-
-            if flag_type == "warning":
-                st.warning(f"{message} (Source: {agent})")
-            elif flag_type == "info":
-                st.info(f"{message} (Source: {agent})")
-            else:
-                st.error(f"{message} (Source: {agent})")
+        with col1:
+            st.metric("Confidence Score", f"{confidence:.2f}")
+        with col2:
+            st.metric("Total Sources", total_sources)
+        with col3:
+            st.metric("Processing Time (s)", processing_time)
 
         st.markdown("---")
 
-    # --- Export ---
-    st.subheader("Export Report")
-    markdown_report = generate_markdown_report(result)
-    st.download_button(
-        label="Download Markdown Report",
-        data=markdown_report,
-        file_name=f"market_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-        mime="text/markdown",
-        width="stretch",
-    )
-    st.caption(f"Generated at {datetime.now().strftime('%H:%M:%S')}")
+        # --- Competitors ---
+        st.subheader("Identified Competitors")
+        validated = result.get("validated_insights", {})
+        competitors = validated.get("competitors", [])
+        if competitors:
+            st.write(", ".join(str(c) for c in competitors))
+            st.caption(f"{len(competitors)} competitors identified")
+        else:
+            st.info("No competitors identified.")
+
+        st.markdown("---")
+
+        # --- Content Themes ---
+        st.subheader("Content Themes")
+        themes = validated.get("content_themes", [])
+        if themes:
+            for theme in themes:
+                try:
+                    name = theme.get("theme", "Unknown")
+                    freq = theme.get("frequency", 0)
+                    sentiment = theme.get("sentiment", 0)
+                    st.write(f"- **{name}** | Mentions: {freq} | Sentiment: {sentiment:.2f}")
+                except (ValueError, TypeError):
+                    st.write(f"- {theme}")
+        else:
+            st.info("No themes available.")
+
+        st.markdown("---")
+
+        # --- Positioning Map ---
+        st.subheader("Competitive Positioning Map")
+        positioning_map = validated.get("positioning_map", {})
+        if positioning_map and len(positioning_map) > 0:
+            try:
+                fig = generate_positioning_map(positioning_map)
+                st.plotly_chart(fig, width="stretch")
+            except Exception as e:
+                st.warning(f"Could not generate positioning map: {str(e)}")
+        else:
+            st.info("Positioning map not available.")
+
+        st.markdown("---")
+
+        # --- Recommendations ---
+        st.subheader("Content Recommendations")
+        recommendations = validated.get("content_recommendations", [])
+        if recommendations:
+            for rec in recommendations:
+                try:
+                    topic = rec.get("topic", "Untitled")
+                    priority = rec.get("priority", "medium").capitalize()
+                    st.write(f"- **{topic}** ({priority} priority)")
+                except (ValueError, TypeError):
+                    st.write(f"- {rec}")
+        else:
+            st.info("No recommendations available.")
+
+        st.markdown("---")
+
+        # --- Quality Flags ---
+        quality_flags = result.get("quality_flags", [])
+        if quality_flags:
+            st.subheader("Quality Insights")
+            for flag in quality_flags:
+                try:
+                    flag_type = flag.get("type", "info")
+                    message = flag.get("message", "")
+                    agent = flag.get("agent", "unknown")
+
+                    if flag_type == "warning":
+                        st.warning(f"{message} (Source: {agent})")
+                    elif flag_type == "info":
+                        st.info(f"{message} (Source: {agent})")
+                    elif flag_type == "error":
+                        st.error(f"{message} (Source: {agent})")
+                except Exception:
+                    st.info(str(flag))
+
+            st.markdown("---")
+
+        # --- Export ---
+        st.subheader("Export Report")
+        try:
+            markdown_report = generate_markdown_report(result)
+            st.download_button(
+                label="Download Markdown Report",
+                data=markdown_report,
+                file_name=f"market_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                mime="text/markdown",
+                width="stretch",
+            )
+        except Exception as e:
+            st.warning(f"Could not generate markdown report: {str(e)}")
+
+        st.caption(f"Generated at {datetime.now().strftime('%H:%M:%S')}")
+
+    except Exception as e:
+        st.error(f"Error displaying results: {str(e)}")
+        logger.error(f"Error in display_results: {e}", exc_info=True)
 
 
 # -------------------- LOAD RESULT --------------------
@@ -197,7 +237,7 @@ with st.sidebar:
         "AI-powered analytics tools",
     ]
     for example in examples:
-        if st.button(example, key=f"example_{example}", use_container_width=True):
+        if st.button(example, key=f"example_{example}", width="stretch"):
             st.session_state.example_query = example
             st.rerun()
 
@@ -229,33 +269,73 @@ if "example_query" in st.session_state:
     del st.session_state.example_query
 
 # -------------------- PROCESS QUERY --------------------
+# Utility: Validate query input
+def validate_query(query: str) -> tuple[bool, str]:
+    """Validate query for edge cases"""
+    if not query or not query.strip():
+        return False, "Query cannot be empty"
+    if len(query) > 5000:
+        return False, "Query is too long (max 5000 characters). Please shorten your query."
+    return True, ""
+
+
 if user_query:
-    st.session_state.messages.append({"role": "user", "content": user_query})
-    with st.chat_message("user"):
-        st.markdown(user_query)
+    # Validate query
+    is_valid, error_msg = validate_query(user_query)
+    if not is_valid:
+        st.error(f"Invalid query: {error_msg}")
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        with st.chat_message("user"):
+            st.markdown(user_query)
 
-    with st.chat_message("assistant"):
-        st.write("Processing your request...")
-        orchestrator = AgentOrchestrator()
-        start_time = time.time()
-        result = orchestrator.run(user_query)
-        elapsed = round(time.time() - start_time, 2)
-        result["report_metadata"]["processing_time_seconds"] = elapsed
-        result["query_text"] = user_query
+        with st.chat_message("assistant"):
+            orchestrator = AgentOrchestrator()
+            start_time = time.time()
 
-        st.session_state.current_result = result
-        st.session_state.selected_query_id = None
+            try:
+                with st.spinner("Analyzing market..."):
+                    result = orchestrator.run(user_query)
+                elapsed = round(time.time() - start_time, 2)
+                result["report_metadata"]["processing_time_seconds"] = elapsed
+                result["query_text"] = user_query
 
-        display_results(result)
+                # Check for empty results
+                competitors = result.get("validated_insights", {}).get("competitors", [])
+                themes = result.get("validated_insights", {}).get("content_themes", [])
+                recommendations = result.get("validated_insights", {}).get("content_recommendations", [])
 
-    try:
-        # Derive short title for sidebar display (e.g. top theme or truncated query)
-        short_title = user_query[:50]
-        history.save_query(user_query, result, title=short_title)
-    except Exception:
-        pass
+                has_results = bool(competitors or themes or recommendations)
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": f"Analysis complete. Confidence: {result['report_metadata']['confidence_score']:.2f}."
-    })
+                if not has_results:
+                    st.warning("⚠️ No results found for this query. The market might be niche or undefined. Try a different query.")
+                    result["quality_flags"] = result.get("quality_flags", [])
+                    result["quality_flags"].append({
+                        "type": "warning",
+                        "message": "No competitive insights found for this market",
+                        "agent": "orchestrator"
+                    })
+
+                st.session_state.current_result = result
+                st.session_state.selected_query_id = None
+
+                display_results(result)
+
+            except TimeoutError:
+                st.error("⏱️ Query processing timed out. This usually means the research agents took too long. Please try again with a simpler query.")
+            except Exception as e:
+                st.error(f"❌ An error occurred: {str(e)}")
+                logger.error(f"Error processing query: {e}", exc_info=True)
+
+        try:
+            # Only save if we have valid results
+            if st.session_state.current_result:
+                history.save_query(user_query, st.session_state.current_result)
+        except Exception as e:
+            logger.warning(f"Failed to save query to history: {e}")
+
+        if st.session_state.current_result:
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"Analysis complete. Confidence: {st.session_state.current_result['report_metadata']['confidence_score']:.2f}."
+            })
