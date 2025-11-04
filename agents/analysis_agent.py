@@ -1,12 +1,15 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 import spacy
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from typing import Dict, List
 from core.config import config
+from utils.debug_exporter import debug_exporter
 import logging
 import os
+import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -27,30 +30,37 @@ class AnalysisAgent:
         """Initialize analysis tools"""
         # OpenAI embeddings
         self.embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small",
+            model="text-embedding-3-large",
             dimensions=1536,
             api_key=config.OPENAI_API_KEY
         )
-        
+
+        # OpenAI LLM for competitor extraction
+        self.llm = ChatOpenAI(
+            model="gpt-4.1-mini",  # Fast and cheap for extraction
+            temperature=0,
+            api_key=config.OPENAI_API_KEY
+        )
+
         # Text splitter for chunking
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=512,
             chunk_overlap=50,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
-        
+
         # spaCy for NER
         try:
-            self.nlp = spacy.load("en_core_web_sm")
-            logger.info("spaCy model loaded successfully")
+            self.nlp = spacy.load("en_core_web_lg")
+            logger.info("spaCy large model loaded successfully")
         except Exception as e:
             logger.error(f"Failed to load spaCy model: {e}")
-            logger.info("Run: python -m spacy download en_core_web_sm")
+            logger.info("Run: python -m spacy download en_core_web_lg")
             self.nlp = None
-        
+
         # VADER for sentiment
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
-        
+
         logger.info("Analysis Agent initialized")
     
     def run(self, research_data: Dict) -> Dict:
@@ -94,10 +104,25 @@ class AnalysisAgent:
         competitors = self._identify_competitors(research_data["sources"])
         themes = self._extract_themes(research_data["sources"])
         competitor_attributes = self._analyze_competitors(
-            competitors, 
-            vectorstore, 
+            competitors,
+            vectorstore,
             research_data["sources"]
         )
+
+        # DEBUG: Export debug report (if debug mode enabled)
+        try:
+            if logger.level <= logging.DEBUG:
+                query = research_data.get("query", "unknown")
+                debug_exporter.export_analysis_debug(
+                    query=query,
+                    sources=research_data["sources"],
+                    llm_competitors=getattr(self, '_last_llm_competitors', []),
+                    ner_competitors=getattr(self, '_last_ner_competitors', []),
+                    final_competitors=competitors,
+                    validation_results=None  # Will be filled by quality agent
+                )
+        except Exception as e:
+            logger.warning(f"Failed to export debug report: {e}")
         
         output = {
             "competitors": competitors,
@@ -132,73 +157,255 @@ class AnalysisAgent:
     
     def _identify_competitors(self, sources: List[Dict]) -> List[str]:
         """
-        Use NER to identify company names from sources
-        
+        Use hybrid approach (LLM + NER) to identify company names from sources
+
         Args:
             sources: List of source dictionaries
-            
+
         Returns:
             List of competitor names
         """
-        if not self.nlp:
-            logger.warning("spaCy not available, using fallback competitor detection")
-            return self._fallback_competitor_detection(sources)
-        
+        # Step 1: Use LLM extraction (primary method)
+        llm_competitors = self._llm_competitor_extraction(sources)
+
+        # Step 2: Use spaCy NER as backup/enhancement (DISABLED - causes noise)
+        # NER was extracting title fragments like "Best Influencer Marketing Software"
+        # LLM extraction is much more accurate, so we disable NER
+        ner_competitors = []
+        # if self.nlp:
+        #     ner_competitors = self._ner_competitor_extraction(sources)
+        # else:
+        #     logger.warning("spaCy not available, skipping NER extraction")
+        #     ner_competitors = []
+
+        # Save for debug export
+        self._last_llm_competitors = llm_competitors
+        self._last_ner_competitors = ner_competitors
+
+        # Step 3: Use LLM results directly (NER disabled)
+        all_competitors = {}
+
+        # Use LLM results only
+        for comp in llm_competitors:
+            all_competitors[comp] = all_competitors.get(comp, 0) + 1
+
+        # NER disabled due to noise
+        # for comp in ner_competitors:
+        #     all_competitors[comp] = all_competitors.get(comp, 0) + 1
+
+        # Sort by combined score and return top 15
+        sorted_competitors = sorted(
+            all_competitors.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        result = [name for name, score in sorted_competitors[:15]]
+        logger.info(f"Identified {len(result)} competitors (LLM only - NER disabled due to noise)")
+        return result
+
+    def _llm_competitor_extraction(self, sources: List[Dict]) -> List[str]:
+        """
+        Use LLM to extract competitor names from sources
+
+        Args:
+            sources: List of source dictionaries
+
+        Returns:
+            List of competitor company/product names
+        """
+        # Combine source texts for analysis
+        texts = []
+        for source in sources[:15]:  # Limit to 15 sources to avoid token limits
+            text = f"{source.get('title', '')}. {source.get('snippet', '')}"
+            if text.strip():
+                texts.append(text)
+
+        combined_text = "\n\n".join(texts)
+
+        # DEBUG: Log the input text being sent to LLM
+        logger.debug("=" * 80)
+        logger.debug("LLM INPUT TEXT (first 1000 chars):")
+        logger.debug(combined_text[:1000])
+        logger.debug("=" * 80)
+
+        # Create extraction prompt with better context
+        prompt = f"""You are analyzing search results to find competitor companies and products.
+
+        Extract ALL company names, product names, and software tool names mentioned in the text below.
+
+        DO EXTRACT (examples of what TO extract):
+        - Software companies: "HubSpot", "Salesforce", "Zoho"
+        - Influencer platforms: "Aspire", "Grin", "Upfluence", "Creator.co", "Traackr"
+        - SaaS products: "ActiveCampaign", "Pipedrive", "Monday.com"
+        - Any proper noun that is a brand/company/product name
+
+        DO NOT EXTRACT (examples of what NOT to extract):
+        - Generic categories: "CRM", "Software", "Tools", "Platform", "App"
+        - Adjectives: "Best", "Top", "Free", "Simple", "Easy", "Popular"
+        - Common words: "Business", "Small", "Marketing", "Management"
+        - Sentence fragments or phrases
+        - Acronyms without context (unless they're well-known brands like "IBM")
+
+        Text to analyze:
+        {combined_text}
+
+        IMPORTANT: Be comprehensive - extract ALL company/product names you can find, even if mentioned only once.
+
+        Return ONLY a JSON array of company/product names: ["Company1", "Company2", "Company3", ...]
+        No explanations, just the JSON array."""
+
+        try:
+            response = self.llm.invoke(prompt)
+            content = response.content.strip()
+
+            # DEBUG: Log raw LLM response
+            logger.debug("LLM RAW RESPONSE:")
+            logger.debug(content)
+            logger.debug("=" * 80)
+
+            # Parse JSON response
+            # Handle cases where LLM might wrap in markdown code blocks
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+
+            competitors = json.loads(content)
+
+            # DEBUG: Log parsed competitors before filtering
+            logger.debug(f"LLM PARSED COMPETITORS (before filtering): {competitors}")
+
+            # Additional filtering: remove common stop words
+            stop_words = {
+                "best", "top", "free", "simple", "easy", "software", "tool", "tools",
+                "platform", "solution", "solutions", "service", "services", "app", "apps",
+                "business", "small", "crm", "management", "system", "contact", "marketing"
+            }
+
+            filtered = []
+            filtered_out = []
+
+            for comp in competitors:
+                if isinstance(comp, str) and len(comp) > 2:
+                    # Check each filter condition
+                    is_stop_word = comp.lower() in stop_words
+                    is_all_caps = bool(re.match(r'^[A-Z\s]+$', comp))
+
+                    if is_stop_word or is_all_caps:
+                        filtered_out.append((comp, "stop_word" if is_stop_word else "all_caps"))
+                    else:
+                        filtered.append(comp)
+
+            # DEBUG: Log filtering results
+            logger.debug(f"LLM FILTERED COMPETITORS ({len(filtered)}): {filtered}")
+            if filtered_out:
+                logger.debug(f"LLM FILTERED OUT ({len(filtered_out)}): {filtered_out}")
+
+            logger.info(f"LLM extracted {len(filtered)} competitors from {len(sources)} sources")
+            return filtered[:15]  # Increased from 10 to 15
+
+        except Exception as e:
+            logger.error(f"LLM competitor extraction failed: {e}")
+            logger.error(f"Raw response: {content if 'content' in locals() else 'N/A'}")
+            return []
+
+    def _ner_competitor_extraction(self, sources: List[Dict]) -> List[str]:
+        """
+        Use spaCy NER to extract organization names
+
+        Args:
+            sources: List of source dictionaries
+
+        Returns:
+            List of organization names
+        """
         competitors = {}  # Use dict to track frequency
-        
+
         for source in sources:
             # Combine title and snippet
             text = f"{source.get('title', '')} {source.get('snippet', '')}"
-            
+
             # Run NER
             doc = self.nlp(text)
-            
+
             # Extract ORG entities
             for ent in doc.ents:
                 if ent.label_ == "ORG":
                     name = ent.text.strip()
                     # Filter out common non-company words
-                    if len(name) > 2 and name not in ["The", "Inc", "LLC", "Ltd"]:
+                    stop_words = {"The", "Inc", "LLC", "Ltd", "Best", "Top", "Free"}
+                    if len(name) > 2 and name not in stop_words:
                         competitors[name] = competitors.get(name, 0) + 1
-        
+
         # Sort by frequency and return top 10
         sorted_competitors = sorted(
-            competitors.items(), 
-            key=lambda x: x[1], 
+            competitors.items(),
+            key=lambda x: x[1],
             reverse=True
         )
-        
-        result = [name for name, count in sorted_competitors[:10]]
-        logger.info(f"Identified {len(result)} competitors via NER")
+
+        result = [name for name, count in sorted_competitors[:15]]
+        logger.info(f"NER extracted {len(result)} competitors")
         return result
     
     def _fallback_competitor_detection(self, sources: List[Dict]) -> List[str]:
         """
-        Fallback method for competitor detection without spaCy
-        
+        Improved fallback method for competitor detection without spaCy/LLM
+
         Args:
             sources: List of source dictionaries
-            
+
         Returns:
             List of potential competitor names
         """
-        # Look for capitalized words that might be company names
-        import re
-        
-        competitors = set()
-        
+        # Stop words to filter out
+        stop_words = {
+            # Common adjectives
+            "best", "top", "free", "simple", "easy", "popular", "leading",
+            "powerful", "essential", "ultimate", "complete", "perfect",
+            # Generic business terms
+            "software", "tool", "tools", "platform", "solution", "solutions",
+            "service", "services", "app", "apps", "system", "systems",
+            "business", "small", "contact", "management", "customer",
+            # CRM-specific terms
+            "crm", "marketing", "sales", "email", "campaign",
+            # Common words
+            "the", "and", "for", "with", "your", "more", "about",
+            "this", "that", "from", "their", "they", "what", "when"
+        }
+
+        competitors_count = {}
+
         for source in sources:
             text = f"{source.get('title', '')} {source.get('snippet', '')}"
-            
-            # Find capitalized words (potential company names)
-            words = re.findall(r'\b[A-Z][a-z]+(?:[A-Z][a-z]+)*\b', text)
-            
-            for word in words:
-                if len(word) > 3:  # Filter very short words
-                    competitors.add(word)
-        
-        result = list(competitors)[:10]
-        logger.info(f"Identified {len(result)} potential competitors via fallback")
+
+            # Find potential company names (capitalized words, including multi-word names)
+            # Match patterns like "HubSpot", "Zoho CRM", "ActiveCampaign"
+            potential_names = re.findall(r'\b[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*\b', text)
+
+            for name in potential_names:
+                name = name.strip()
+                name_lower = name.lower()
+
+                # Filter by length and stop words
+                if (
+                    len(name) > 3
+                    and name_lower not in stop_words
+                    and not name.isupper()  # Skip all-caps words (likely acronyms)
+                    and not re.match(r'^\d+', name)  # Skip numbers
+                ):
+                    competitors_count[name] = competitors_count.get(name, 0) + 1
+
+        # Sort by frequency and take top 10
+        sorted_competitors = sorted(
+            competitors_count.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        result = [name for name, count in sorted_competitors[:10]]
+        logger.info(f"Fallback extracted {len(result)} potential competitors")
         return result
     
     def _extract_themes(self, sources: List[Dict]) -> List[Dict]:
@@ -217,11 +424,21 @@ class AnalysisAgent:
         from collections import Counter
         import re
         
-        # Common words to ignore
+        # Extended stop words to filter garbage themes
         stop_words = set([
+            # Common articles and prepositions
             'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
             'in', 'with', 'to', 'for', 'of', 'as', 'by', 'that', 'this',
-            'from', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had'
+            'from', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had',
+            # Generic business terms that shouldn't be themes
+            'best', 'top', 'free', 'simple', 'easy', 'software', 'tool', 'tools',
+            'platform', 'solution', 'service', 'app', 'system', 'business',
+            'company', 'product', 'features', 'pricing', 'review', 'reviews',
+            # Common query words
+            'what', 'when', 'where', 'which', 'who', 'how', 'why',
+            'can', 'will', 'should', 'would', 'could', 'may', 'might',
+            'more', 'most', 'some', 'any', 'all', 'each', 'every',
+            'their', 'they', 'them', 'your', 'you', 'our', 'we', 'us'
         ])
         
         # Extract all words
@@ -230,14 +447,18 @@ class AnalysisAgent:
             for s in sources
         ])
         
-        # Clean and tokenize
+        # Clean and tokenize (lowercase, min 4 chars)
         words = re.findall(r'\b[a-z]{4,}\b', all_text.lower())
-        
+
         # Filter stop words and count
         word_counts = Counter([
-            word for word in words 
+            word for word in words
             if word not in stop_words
         ])
+
+        # DEBUG: Log theme extraction
+        logger.debug(f"Theme extraction: {len(word_counts)} unique words after filtering")
+        logger.debug(f"Top 10 themes: {word_counts.most_common(10)}")
         
         # Get top themes
         themes = []
