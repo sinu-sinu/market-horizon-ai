@@ -287,39 +287,42 @@ class StrategyAgent:
     def _generate_content_recommendations(self, themes: List[Dict], competitors: List[str]) -> List[Dict]:
         """
         Generate content gap recommendations
-        
+
         Args:
             themes: Content themes from Analysis Agent
             competitors: List of competitors
-            
+
         Returns:
             List of content recommendation dicts
         """
         recommendations = []
-        
+
         if not themes:
             logger.warning("No themes available for content recommendations")
             return recommendations
-        
+
         # Generate recommendations based on themes
         for theme in themes[:5]:  # Top 5 themes
             # Calculate priority based on frequency
             frequency = theme.get("frequency", 0)
             priority = "high" if frequency > 10 else "medium" if frequency > 5 else "low"
-            
+
             # Calculate opportunity score
             # Higher frequency and positive sentiment = higher opportunity
             sentiment = theme.get("sentiment", 0.0)
             opportunity_score = min(10.0, (frequency / 3.0) + (sentiment * 2) + 5.0)
-            
+
             # Estimate search volume (simplified)
             search_volume = frequency * 200  # Rough estimate
-            
+
             # Determine format based on theme
             format_suggestion = self._suggest_content_format(theme["theme"])
-            
+
+            # Generate more specific topic title
+            topic_title = self._generate_topic_title(theme["theme"])
+
             recommendations.append({
-                "topic": f"{theme['theme']} best practices",
+                "topic": topic_title,
                 "priority": priority,
                 "opportunity_score": round(opportunity_score, 1),
                 "search_volume_monthly": search_volume,
@@ -327,35 +330,69 @@ class StrategyAgent:
                 "recommended_format": format_suggestion,
                 "estimated_effort": "medium"
             })
-        
+
         # Sort by opportunity score
         recommendations.sort(key=lambda x: x["opportunity_score"], reverse=True)
-        
+
         logger.info(f"Generated {len(recommendations)} content recommendations")
         return recommendations
     
+    def _generate_topic_title(self, theme: str) -> str:
+        """
+        Generate specific, actionable topic titles instead of generic "X best practices"
+
+        Args:
+            theme: Theme name
+
+        Returns:
+            More specific topic title
+        """
+        theme_lower = theme.lower()
+
+        # Map themes to more specific content ideas
+        if any(word in theme_lower for word in ["integration", "api", "connect"]):
+            return f"How to integrate {theme} with your workflow"
+        elif any(word in theme_lower for word in ["pricing", "cost", "budget"]):
+            return f"{theme}: ROI analysis and cost comparison"
+        elif any(word in theme_lower for word in ["setup", "install", "config"]):
+            return f"Complete {theme} setup guide for beginners"
+        elif any(word in theme_lower for word in ["security", "privacy", "compliance"]):
+            return f"{theme} security & compliance checklist"
+        elif any(word in theme_lower for word in ["migration", "switch", "move"]):
+            return f"How to migrate to {theme} without downtime"
+        elif any(word in theme_lower for word in ["vs", "comparison", "difference"]):
+            return f"{theme}: comparison with alternatives"
+        elif any(word in theme_lower for word in ["trend", "future", "emerging"]):
+            return f"The future of {theme}: 2024+ trends"
+        elif any(word in theme_lower for word in ["performance", "speed", "optimization"]):
+            return f"Optimizing {theme} for maximum performance"
+        else:
+            return f"Deep dive into {theme}"
+
     def _suggest_content_format(self, theme: str) -> str:
         """
         Suggest content format based on theme
-        
+
         Args:
             theme: Theme name
-            
+
         Returns:
             Suggested format string
         """
         theme_lower = theme.lower()
-        
-        if any(word in theme_lower for word in ["how", "guide", "tutorial"]):
-            return "Tutorial + video"
+
+        if any(word in theme_lower for word in ["how", "guide", "tutorial", "setup", "install"]):
+            return "Tutorial"
         elif any(word in theme_lower for word in ["comparison", "vs", "versus"]):
-            return "Comparison article + infographic"
+            return "Comparison"
         elif any(word in theme_lower for word in ["best", "top", "review"]):
-            return "Review roundup + checklist"
+            return "Review/Roundup"
         elif any(word in theme_lower for word in ["case", "study", "example"]):
-            return "Case study + webinar"
+            return "Case Study"
+        elif any(word in theme_lower for word in ["security", "compliance", "checklist"]):
+            return "Checklist"
         else:
-            return "Blog post + infographic"
+            return "Article"
     
     def _generate_strategic_moves(self, positioning_map: Dict, zones: List[Dict]) -> List[str]:
         """
