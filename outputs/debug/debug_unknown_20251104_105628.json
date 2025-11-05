@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "query": "unknown",
+    "timestamp": "2025-11-04T10:56:28.151392",
+    "total_sources": 10
+  },
+  "sources_analysis": {
+    "count": 10,
+    "sample_titles": [
+      "20 Best Job Search Sites in 2025",
+      "Job Search: Millions of US Jobs (HIRING NOW) Near You - 2025",
+      "5 Best Job Search Sites of October 2025 - Money",
+      "Indeed: Job Search",
+      "Best Job Search Sites October 2025"
+    ],
+    "sample_snippets": [
+      "20 Best Job Search Websites: Search Engines and Job Boards · 1. FlexJobs · 2. Remote.co · 3. CareerBuilder · 4. Dice · 5. Glassdoor · 6. Google ...",
+      "Phil, your career advisor will help you find the right job opening from companies hiring in the US. Find job postings near you & 1-click apply to get hired.",
+      "The best job search sites include: LinkedIn (Best Overall), Indeed (Best for Job Diversity), Glassdoor (Best for Salary Info) and more.",
+      "With Indeed, you can search millions of jobs online to find the next step in your career. With tools for job search, resumes, company reviews and more, ...",
+      "Indeed is a great job search engine for beginners because it displays the full breadth of opportunities that are available in a specific area or industry."
+    ]
+  },
+  "competitor_extraction": {
+    "llm_extracted": {
+      "count": 14,
+      "competitors": [
+        "FlexJobs",
+        "Remote.co",
+        "CareerBuilder",
+        "Dice",
+        "Glassdoor",
+        "Google",
+        "LinkedIn",
+        "Indeed",
+        "Simplify",
+        "Facebook",
+        "Instagram",
+        "Pinterest",
+        "Handshake",
+        "first2apply.com"
+      ]
+    },
+    "ner_extracted": {
+      "count": 0,
+      "competitors": []
+    },
+    "final_merged": {
+      "count": 14,
+      "competitors": [
+        "FlexJobs",
+        "Remote.co",
+        "CareerBuilder",
+        "Dice",
+        "Glassdoor",
+        "Google",
+        "LinkedIn",
+        "Indeed",
+        "Simplify",
+        "Facebook",
+        "Instagram",
+        "Pinterest",
+        "Handshake",
+        "first2apply.com"
+      ]
+    }
+  },
+  "validation": {},
+  "sources_full": [
+    {
+      "url": "https://www.flexjobs.com/blog/post/best-job-search-sites",
+      "title": "20 Best Job Search Sites in 2025",
+      "snippet": "20 Best Job Search Websites: Search Engines and Job Boards · 1. FlexJobs · 2. Remote.co · 3. CareerBuilder · 4. Dice · 5. Glassdoor · 6. Google ...",
+      "date": "Oct 14, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.ziprecruiter.com/",
+      "title": "Job Search: Millions of US Jobs (HIRING NOW) Near You - 2025",
+      "snippet": "Phil, your career advisor will help you find the right job opening from companies hiring in the US. Find job postings near you & 1-click apply to get hired.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://money.com/best-job-search-sites/",
+      "title": "5 Best Job Search Sites of October 2025 - Money",
+      "snippet": "The best job search sites include: LinkedIn (Best Overall), Indeed (Best for Job Diversity), Glassdoor (Best for Salary Info) and more.",
+      "date": "Oct 2, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.indeed.com/",
+      "title": "Indeed: Job Search",
+      "snippet": "With Indeed, you can search millions of jobs online to find the next step in your career. With tools for job search, resumes, company reviews and more, ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.edvisors.com/plan-for-college/careers/best-job-search-sites/",
+      "title": "Best Job Search Sites October 2025",
+      "snippet": "Indeed is a great job search engine for beginners because it displays the full breadth of opportunities that are available in a specific area or industry.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://simplify.jobs/",
+      "title": "Simplify | Your entire job search in one place.",
+      "snippet": "Your entire job search. Powered by one profile. Get personalized job recommendations, craft tailored resumes, autofill and track your job applications.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.aportlandcareer.com/6-best-social-media-platforms-for-job-seekers/",
+      "title": "The 6 Best Social Media Platforms for Job Seekers",
+      "snippet": "On This Page · Different platforms work for different people · Facebook for career development · Instagram for career development · Pinterest for career ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://joinhandshake.com/",
+      "title": "Handshake: Careers start here | Handshake",
+      "snippet": "The better career social network built for Gen Z · Almost 1M employers with opportunities to land that first, second, and third job · Jobs and internships you ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.reddit.com/r/jobsearchhacks/comments/1dobqt8/what_online_tools_do_you_use_in_your_job_search/",
+      "title": "What online tools do you use in your job search? Are there ...",
+      "snippet": "You can give https://first2apply.com/ a try, it's an aggregator that can search jobs from 10+ sites like linkedin, indeed, glassdoor, dice etc.",
+      "date": "1 year ago",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.careeronestop.org/JobSearch/job-search.aspx",
+      "title": "Job Search",
+      "snippet": "Plan your job search. Create a job search plan · Gather your documents · Your knowledge, skills, and abilities (KSAs) · Research employers.",
+      "date": "Unknown",
+      "source_type": "web"
+    }
+  ]
+}

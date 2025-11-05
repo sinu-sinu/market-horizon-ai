@@ -1,0 +1,131 @@
+{
+  "metadata": {
+    "query": "unknown",
+    "timestamp": "2025-11-04T10:03:26.497617",
+    "total_sources": 10
+  },
+  "sources_analysis": {
+    "count": 10,
+    "sample_titles": [
+      "B2B Lead Finder",
+      "20 Top B2B Contact Database Companies for Sales",
+      "Find B2B Leads from 700M+ Database",
+      "B2B Leads Finder & Database | Find Verified Leads",
+      "Seamless.AI - Best AI Sales Software & Business Leads Platform"
+    ],
+    "sample_snippets": [
+      "Find and enrich 450M leads with AI. Discover and close your perfect buyers using our AI-powered workflows and vast database of over 450 million contacts.",
+      "5. RocketReach. RocketReach is another outbound lead generation tool you can use to gather B2B data, such as email addresses and phone numbers.",
+      "Saleshandy B2B Lead Finder lets you easily find email addresses and phone numbers. Find leads and directly add them to your Saleshandy sequence.",
+      "B2B Leads Finder by Skrapp gives you access to a verified B2B database. Search, filter, and connect with 200M+ leads to scale outreach.",
+      "Find anyone's email address in seconds. Over 1.8 billion+ business emails researched, validated, and verified. Use AI to contact any B2B professional in seconds ..."
+    ]
+  },
+  "competitor_extraction": {
+    "llm_extracted": {
+      "count": 9,
+      "competitors": [
+        "B2B Lead Finder",
+        "RocketReach",
+        "Saleshandy",
+        "Skrapp",
+        "Seamless.AI",
+        "B2B Rocket",
+        "Snov.io",
+        "Getprospect",
+        "Instantly"
+      ]
+    },
+    "ner_extracted": {
+      "count": 0,
+      "competitors": []
+    },
+    "final_merged": {
+      "count": 9,
+      "competitors": [
+        "B2B Lead Finder",
+        "RocketReach",
+        "Saleshandy",
+        "Skrapp",
+        "Seamless.AI",
+        "B2B Rocket",
+        "Snov.io",
+        "Getprospect",
+        "Instantly"
+      ]
+    }
+  },
+  "validation": {},
+  "sources_full": [
+    {
+      "url": "https://instantly.ai/b2b-lead-finder",
+      "title": "B2B Lead Finder",
+      "snippet": "Find and enrich 450M leads with AI. Discover and close your perfect buyers using our AI-powered workflows and vast database of over 450 million contacts.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.kaspr.io/blog/b2b-contact-database",
+      "title": "20 Top B2B Contact Database Companies for Sales",
+      "snippet": "5. RocketReach. RocketReach is another outbound lead generation tool you can use to gather B2B data, such as email addresses and phone numbers.",
+      "date": "Jul 24, 2025",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.saleshandy.com/lead-finder/",
+      "title": "Find B2B Leads from 700M+ Database",
+      "snippet": "Saleshandy B2B Lead Finder lets you easily find email addresses and phone numbers. Find leads and directly add them to your Saleshandy sequence.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://skrapp.io/b2b-lead-finder",
+      "title": "B2B Leads Finder & Database | Find Verified Leads",
+      "snippet": "B2B Leads Finder by Skrapp gives you access to a verified B2B database. Search, filter, and connect with 200M+ leads to scale outreach.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://seamless.ai/",
+      "title": "Seamless.AI - Best AI Sales Software & Business Leads Platform",
+      "snippet": "Find anyone's email address in seconds. Over 1.8 billion+ business emails researched, validated, and verified. Use AI to contact any B2B professional in seconds ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.b2brocket.ai/lead-search",
+      "title": "AI Lead Search for High-Quality B2B Leads",
+      "snippet": "Use AI-powered Lead Search to find top B2B leads. Filter by industry, role, and intent to boost conversions. Try B2B Rocket's lead tool today!",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://snov.io/b2b-lead-finder",
+      "title": "B2B Lead finder & Database",
+      "snippet": "Snov.io Lead Finder is a set of tools for finding B2B leads quickly and efficiently. It allows businesses to access a comprehensive B2B leads database.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://getprospect.com/b2b-contact-database",
+      "title": "Contacts database • Find business contacts and B2B leads",
+      "snippet": "One way to get business contacts is to use the Getprospect B2B leads database. There you get access to 200M contacts with email addresses. Also, here you can ...",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://www.leadsforge.ai/blog/instantly-b2b-lead-finder",
+      "title": "Unbiased Instantly B2B Lead Finder Review: Is It Good in ...",
+      "snippet": "Instantly B2B Lead Finder is a feature inside Instantly that helps you find business contacts without using any third-party tools.",
+      "date": "Unknown",
+      "source_type": "web"
+    },
+    {
+      "url": "https://reply.io/data/",
+      "title": "Real-Time B2B Database with 1+ Billion Contacts",
+      "snippet": "Access 1+ billion contacts and 60+ million accounts with real-time intent signals and built-in email validation to boost outreach accuracy.",
+      "date": "Unknown",
+      "source_type": "web"
+    }
+  ]
+}
