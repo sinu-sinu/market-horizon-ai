@@ -117,6 +117,8 @@ def log_llm_call(
     output_text: str,
     input_tokens: int = 0,
     output_tokens: int = 0,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
     metadata: Optional[Dict[str, Any]] = None
 ):
     """
@@ -132,6 +134,8 @@ def log_llm_call(
         output_text: The response from the LLM
         input_tokens: Number of input tokens
         output_tokens: Number of output tokens
+        start_time: When the LLM call started (for latency calculation)
+        end_time: When the LLM call ended (for latency calculation)
         metadata: Optional metadata dict
     """
     if trace_id not in _active_trace_ids:
@@ -154,10 +158,13 @@ def log_llm_call(
                 "input": input_tokens,
                 "output": output_tokens,
             },
-            metadata=metadata or {}
+            metadata=metadata or {},
+            start_time=start_time,
+            end_time=end_time,
         )
         generation.end()
-        logger.debug(f"Logged LLM call: {name} ({input_tokens}+{output_tokens} tokens)")
+        latency_ms = (end_time - start_time).total_seconds() * 1000 if start_time and end_time else 0
+        logger.debug(f"Logged LLM call: {name} ({input_tokens}+{output_tokens} tokens, {latency_ms:.0f}ms)")
     except Exception as e:
         logger.debug(f"Failed to log LLM call: {e}")
 
@@ -391,6 +398,37 @@ def traced(name: Optional[str] = None):
         return wrapper
 
     return decorator
+
+
+def log_score(
+    trace_id: str,
+    name: str,
+    value: float,
+    comment: Optional[str] = None
+):
+    """
+    Log a score to a Langfuse trace.
+
+    Args:
+        trace_id: The trace ID to attach this score to
+        name: Name of the score (e.g., "quality_score", "confidence")
+        value: Score value (0.0 to 1.0)
+        comment: Optional comment explaining the score
+    """
+    client = get_langfuse_client()
+    if not client:
+        return
+
+    try:
+        client.score(
+            trace_id=trace_id,
+            name=name,
+            value=value,
+            comment=comment,
+        )
+        logger.debug(f"Logged score: {name}={value} for trace {trace_id[:8]}...")
+    except Exception as e:
+        logger.debug(f"Failed to log score: {e}")
 
 
 def flush():
