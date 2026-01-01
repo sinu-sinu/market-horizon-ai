@@ -2,7 +2,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from core.prompts import POSITIONING_PROMPT, CONTENT_GAP_PROMPT, STRATEGIC_MOVES_PROMPT
 from core.config import config
-from typing import Dict, List
+from core.observability import log_llm_call
+from typing import Dict, List, Optional
 import json
 import logging
 import re
@@ -32,16 +33,18 @@ class StrategyAgent:
         
         logger.info("Strategy Agent initialized with gpt-4.1-mini")
     
-    def run(self, analysis_insights: Dict) -> Dict:
+    def run(self, analysis_insights: Dict, trace_id: Optional[str] = None) -> Dict:
         """
         Generate positioning strategies and recommendations
-        
+
         Args:
             analysis_insights: Output from Analysis Agent
-            
+            trace_id: Optional Langfuse trace ID for observability
+
         Returns:
             Dict with positioning map, opportunity zones, and recommendations
         """
+        self._current_trace_id = trace_id
         logger.info("Strategy Agent: Generating recommendations")
         
         if not analysis_insights or not analysis_insights.get("competitors"):
@@ -112,10 +115,25 @@ class StrategyAgent:
             formatted_prompt = prompt.format(
                 competitor_data=json.dumps(competitor_data, indent=2)
             )
-            
+
             # Get LLM response
             response = self.llm.invoke(formatted_prompt)
-            
+
+            # Log LLM call to Langfuse with token usage
+            trace_id = getattr(self, "_current_trace_id", None)
+            if trace_id and hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                log_llm_call(
+                    trace_id=trace_id,
+                    name="positioning-map",
+                    model=model_name,
+                    input_text=formatted_prompt,
+                    output_text=response.content,
+                    input_tokens=usage.get('input_tokens', 0),
+                    output_tokens=usage.get('output_tokens', 0),
+                )
+
             # Parse JSON response - handle markdown code blocks
             response_text = response.content.strip()
             
