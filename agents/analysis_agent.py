@@ -3,8 +3,9 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 import spacy
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from typing import Dict, List
+from typing import Dict, List, Optional
 from core.config import config
+from core.observability import log_llm_call
 from utils.debug_exporter import debug_exporter
 import logging
 import os
@@ -63,16 +64,18 @@ class AnalysisAgent:
 
         logger.info("Analysis Agent initialized")
     
-    def run(self, research_data: Dict) -> Dict:
+    def run(self, research_data: Dict, trace_id: Optional[str] = None) -> Dict:
         """
         Analyze research data and extract insights
-        
+
         Args:
             research_data: Output from Research Agent
-            
+            trace_id: Optional Langfuse trace ID for observability
+
         Returns:
             Dict with competitors, themes, attributes, vectorstore path
         """
+        self._current_trace_id = trace_id
         logger.info("Analysis Agent: Processing research data")
         
         if not research_data or not research_data.get("sources"):
@@ -258,6 +261,21 @@ class AnalysisAgent:
         try:
             response = self.llm.invoke(prompt)
             content = response.content.strip()
+
+            # Log LLM call to Langfuse with token usage
+            trace_id = getattr(self, "_current_trace_id", None)
+            if trace_id and hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                log_llm_call(
+                    trace_id=trace_id,
+                    name="competitor-extraction",
+                    model=model_name,
+                    input_text=prompt,
+                    output_text=content,
+                    input_tokens=usage.get('input_tokens', 0),
+                    output_tokens=usage.get('output_tokens', 0),
+                )
 
             # DEBUG: Log raw LLM response
             logger.debug("LLM RAW RESPONSE:")
