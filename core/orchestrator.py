@@ -1,5 +1,6 @@
 from langgraph.graph import StateGraph, END
 from core.state import AgentState
+from core.observability import Tracer, Span, flush as flush_traces
 from utils.cache_manager import get_cache_manager
 from datetime import datetime
 import logging
@@ -62,20 +63,29 @@ class AgentOrchestrator:
         state["current_agent"] = "research"
         logger.info(f"Research Agent: Processing query '{state['query']}'")
 
-        try:
-            result = self.research_agent.run(state["query"])
-            state["research_data"] = result
-            state["api_calls"] += 1
-            logger.info("Research Agent: Completed successfully")
+        trace_id = state.get("trace_id")
+        with Span(trace_id, "research_agent", input_data={"query": state["query"]}) as span:
+            try:
+                result = self.research_agent.run(state["query"], trace_id=trace_id)
+                state["research_data"] = result
+                state["api_calls"] += 1
+                logger.info("Research Agent: Completed successfully")
 
-        except Exception as e:
-            logger.error(f"Research agent failed: {e}", exc_info=True)
-            state["errors"].append({
-                "agent": "research",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat(),
-                "fallback_used": False
-            })
+                # Update span with output summary
+                span.update(output={
+                    "sources_count": len(result.get("sources", [])) if result else 0,
+                    "success": True,
+                })
+
+            except Exception as e:
+                logger.error(f"Research agent failed: {e}", exc_info=True)
+                state["errors"].append({
+                    "agent": "research",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                    "fallback_used": False
+                })
+                span.update(output={"success": False, "error": str(e)})
 
         return state
     
@@ -84,20 +94,29 @@ class AgentOrchestrator:
         state["current_agent"] = "analysis"
         logger.info("Analysis Agent: Processing research data")
 
-        try:
-            result = self.analysis_agent.run(state["research_data"])
-            state["analysis_insights"] = result
-            state["api_calls"] += 1
-            logger.info("Analysis Agent: Completed successfully")
+        trace_id = state.get("trace_id")
+        with Span(trace_id, "analysis_agent", input_data={"has_research_data": bool(state.get("research_data"))}) as span:
+            try:
+                result = self.analysis_agent.run(state["research_data"], trace_id=trace_id)
+                state["analysis_insights"] = result
+                state["api_calls"] += 1
+                logger.info("Analysis Agent: Completed successfully")
 
-        except Exception as e:
-            logger.error(f"Analysis agent failed: {e}", exc_info=True)
-            state["errors"].append({
-                "agent": "analysis",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat(),
-                "fallback_used": False
-            })
+                span.update(output={
+                    "competitors_count": len(result.get("competitors", [])) if result else 0,
+                    "themes_count": len(result.get("content_themes", [])) if result else 0,
+                    "success": True,
+                })
+
+            except Exception as e:
+                logger.error(f"Analysis agent failed: {e}", exc_info=True)
+                state["errors"].append({
+                    "agent": "analysis",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                    "fallback_used": False
+                })
+                span.update(output={"success": False, "error": str(e)})
 
         return state
     
@@ -106,20 +125,29 @@ class AgentOrchestrator:
         state["current_agent"] = "strategy"
         logger.info("Strategy Agent: Generating recommendations")
 
-        try:
-            result = self.strategy_agent.run(state["analysis_insights"])
-            state["strategy_recommendations"] = result
-            state["api_calls"] += 1
-            logger.info("Strategy Agent: Completed successfully")
+        trace_id = state.get("trace_id")
+        with Span(trace_id, "strategy_agent", input_data={"has_analysis_insights": bool(state.get("analysis_insights"))}) as span:
+            try:
+                result = self.strategy_agent.run(state["analysis_insights"], trace_id=trace_id)
+                state["strategy_recommendations"] = result
+                state["api_calls"] += 1
+                logger.info("Strategy Agent: Completed successfully")
 
-        except Exception as e:
-            logger.error(f"Strategy agent failed: {e}", exc_info=True)
-            state["errors"].append({
-                "agent": "strategy",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat(),
-                "fallback_used": False
-            })
+                span.update(output={
+                    "opportunity_zones": len(result.get("opportunity_zones", [])) if result else 0,
+                    "content_recommendations": len(result.get("content_recommendations", [])) if result else 0,
+                    "success": True,
+                })
+
+            except Exception as e:
+                logger.error(f"Strategy agent failed: {e}", exc_info=True)
+                state["errors"].append({
+                    "agent": "strategy",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                    "fallback_used": False
+                })
+                span.update(output={"success": False, "error": str(e)})
 
         return state
     
@@ -128,19 +156,28 @@ class AgentOrchestrator:
         state["current_agent"] = "quality"
         logger.info("Quality Agent: Validating outputs")
 
-        try:
-            result = self.quality_agent.run(state)
-            state["quality_report"] = result
-            logger.info("Quality Agent: Completed successfully")
+        trace_id = state.get("trace_id")
+        with Span(trace_id, "quality_agent", input_data={"has_strategy_recommendations": bool(state.get("strategy_recommendations"))}) as span:
+            try:
+                result = self.quality_agent.run(state, trace_id=trace_id)
+                state["quality_report"] = result
+                logger.info("Quality Agent: Completed successfully")
 
-        except Exception as e:
-            logger.error(f"Quality agent failed: {e}", exc_info=True)
-            state["errors"].append({
-                "agent": "quality",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat(),
-                "fallback_used": False
-            })
+                span.update(output={
+                    "confidence_score": result.get("report_metadata", {}).get("confidence_score", 0) if result else 0,
+                    "quality_flags_count": len(result.get("quality_flags", [])) if result else 0,
+                    "success": True,
+                })
+
+            except Exception as e:
+                logger.error(f"Quality agent failed: {e}", exc_info=True)
+                state["errors"].append({
+                    "agent": "quality",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                    "fallback_used": False
+                })
+                span.update(output={"success": False, "error": str(e)})
 
         return state
     
@@ -157,27 +194,39 @@ class AgentOrchestrator:
         """
         logger.info(f"Orchestrator: Starting pipeline for query: '{query}'")
 
-        # Initialize state
-        initial_state: AgentState = {
-            "query": query,
-            "parameters": parameters or {},
-            "research_data": None,
-            "analysis_insights": None,
-            "strategy_recommendations": None,
-            "quality_report": None,
-            "errors": [],
-            "retry_count": 0,
-            "start_time": datetime.now(),
-            "current_agent": "",
-            "total_tokens": 0,
-            "api_calls": 0
-        }
+        # Create Langfuse trace for the entire pipeline
+        with Tracer(
+            name="market_horizon_pipeline",
+            metadata={
+                "query": query,
+                "parameters": parameters or {},
+            }
+        ) as trace:
+            # Initialize state with trace_id for child spans
+            initial_state: AgentState = {
+                "query": query,
+                "parameters": parameters or {},
+                "research_data": None,
+                "analysis_insights": None,
+                "strategy_recommendations": None,
+                "quality_report": None,
+                "errors": [],
+                "retry_count": 0,
+                "start_time": datetime.now(),
+                "current_agent": "",
+                "total_tokens": 0,
+                "api_calls": 0,
+                "trace_id": trace.id,  # Pass trace ID to agents
+            }
 
-        # Execute workflow
-        final_state = self.workflow.invoke(initial_state)
+            # Execute workflow
+            final_state = self.workflow.invoke(initial_state)
 
-        # Return compiled output
-        return self._compile_output(final_state)
+            # Flush traces before returning
+            flush_traces()
+
+            # Return compiled output
+            return self._compile_output(final_state)
     
     def _compile_output(self, state: AgentState) -> dict:
         """Compile final output from state"""
