@@ -20,6 +20,13 @@ from utils.query_history import QueryHistory
 from utils.cache_manager import CacheManager
 
 
+# -------------------- SINGLETON ORCHESTRATOR --------------------
+@st.cache_resource
+def get_orchestrator():
+    """Get or create orchestrator instance (cached for session)"""
+    return AgentOrchestrator()
+
+
 # -------------------- PAGE CONFIG --------------------
 st.set_page_config(
     page_title="Market Horizon AI",
@@ -185,15 +192,28 @@ def display_results(result: dict):
 
         # --- Export ---
         st.subheader("Export Report")
+
         try:
             markdown_report = generate_markdown_report(result)
-            st.download_button(
-                label="Download Markdown Report",
-                data=markdown_report,
-                file_name=f"market_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                mime="text/markdown",
-                width="stretch",
-            )
+
+            # Create two columns — 3/4 width for download, 1/4 for clear
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                st.download_button(
+                    label="Download Markdown Report",
+                    data=markdown_report,
+                    file_name=f"market_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+
+            with col2:
+                if st.button("Clear Report", use_container_width=True):
+                    st.session_state.current_result = None
+                    st.session_state.selected_query_id = None
+                    st.rerun()
+
         except Exception as e:
             st.warning(f"Could not generate markdown report: {str(e)}")
 
@@ -240,7 +260,7 @@ with st.sidebar:
     # ---- CACHE MANAGEMENT ----
     st.subheader("Cache Management")
     with st.expander(" Cache Tools", expanded=False):
-        orchestrator = AgentOrchestrator()
+        orchestrator = get_orchestrator()
         cache_tabs = st.tabs(["Stats", "Clear", "Advanced"])
 
         # --- TAB 1: STATS ---
@@ -370,12 +390,6 @@ if st.session_state.current_result:
     with st.chat_message("assistant"):
         display_results(st.session_state.current_result)
 
-    if st.button("Clear Report", key="clear_result"):
-        st.session_state.current_result = None
-        st.session_state.selected_query_id = None
-        st.rerun()
-
-
 # -------------------- CHAT SECTION --------------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
@@ -409,7 +423,7 @@ if user_query:
             st.markdown(user_query)
 
         with st.chat_message("assistant"):
-            orchestrator = AgentOrchestrator()
+            orchestrator = get_orchestrator()
             start_time = time.time()
 
             try:
