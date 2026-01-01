@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime
 import logging
 
@@ -30,16 +30,18 @@ class QualityAgent:
         self.confidence_threshold = 0.75
         logger.info("Quality Agent initialized")
     
-    def run(self, state: Dict) -> Dict:
+    def run(self, state: Dict, trace_id: Optional[str] = None) -> Dict:
         """
         Validate and synthesize all agent outputs
-        
+
         Args:
             state: Complete agent state with all outputs
-            
+            trace_id: Optional Langfuse trace ID for observability
+
         Returns:
             Final quality report with validated insights
         """
+        self._current_trace_id = trace_id
         logger.info("Quality Agent: Validating outputs")
         
         # Extract outputs from state
