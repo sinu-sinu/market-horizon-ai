@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from core.state import AgentState
-from core.observability import Tracer, Span, flush as flush_traces
+from core.observability import Tracer, Span, flush as flush_traces, log_score
 from utils.cache_manager import get_cache_manager
 from datetime import datetime
 import logging
@@ -197,6 +197,7 @@ class AgentOrchestrator:
         # Create Langfuse trace for the entire pipeline
         with Tracer(
             name="market_horizon_pipeline",
+            user_id="streamlit-user",  # Default user for Streamlit app
             metadata={
                 "query": query,
                 "parameters": parameters or {},
@@ -222,11 +223,23 @@ class AgentOrchestrator:
             # Execute workflow
             final_state = self.workflow.invoke(initial_state)
 
+            # Compile the output
+            output = self._compile_output(final_state)
+
+            # Log quality score to Langfuse
+            confidence_score = output.get("report_metadata", {}).get("confidence_score", 0)
+            if trace.id and confidence_score:
+                log_score(
+                    trace_id=trace.id,
+                    name="confidence_score",
+                    value=confidence_score,
+                    comment=f"Pipeline confidence score based on data quality and completeness"
+                )
+
             # Flush traces before returning
             flush_traces()
 
-            # Return compiled output
-            return self._compile_output(final_state)
+            return output
     
     def _compile_output(self, state: AgentState) -> dict:
         """Compile final output from state"""
