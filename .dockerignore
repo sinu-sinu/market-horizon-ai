@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Data (will be mounted as volumes)
+data/*.db
+data/faiss_index/
+
+# Outputs (will be mounted as volumes)
+outputs/
+
+# Environment files (will be injected)
+.env
+.env.local
+
+# Cache
+.pytest_cache/
+.cache/
+
+# Logs
+*.log
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+docs/
+plan/
+
+# Tests
+tests/
