@@ -4,6 +4,7 @@ from core.prompts import POSITIONING_PROMPT, CONTENT_GAP_PROMPT, STRATEGIC_MOVES
 from core.config import config
 from core.observability import log_llm_call
 from typing import Dict, List, Optional
+from datetime import datetime
 import json
 import logging
 import re
@@ -116,10 +117,12 @@ class StrategyAgent:
                 competitor_data=json.dumps(competitor_data, indent=2)
             )
 
-            # Get LLM response
+            # Get LLM response with timing
+            llm_start = datetime.now()
             response = self.llm.invoke(formatted_prompt)
+            llm_end = datetime.now()
 
-            # Log LLM call to Langfuse with token usage
+            # Log LLM call to Langfuse with token usage and timing
             trace_id = getattr(self, "_current_trace_id", None)
             if trace_id and hasattr(response, 'usage_metadata'):
                 usage = response.usage_metadata
@@ -132,6 +135,8 @@ class StrategyAgent:
                     output_text=response.content,
                     input_tokens=usage.get('input_tokens', 0),
                     output_tokens=usage.get('output_tokens', 0),
+                    start_time=llm_start,
+                    end_time=llm_end,
                 )
 
             # Parse JSON response - handle markdown code blocks
