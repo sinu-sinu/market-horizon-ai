@@ -4,6 +4,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 import spacy
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from typing import Dict, List, Optional
+from datetime import datetime
 from core.config import config
 from core.observability import log_llm_call
 from utils.debug_exporter import debug_exporter
@@ -259,10 +260,13 @@ class AnalysisAgent:
         No explanations, just the JSON array."""
 
         try:
+            # Capture timing for Langfuse
+            llm_start = datetime.now()
             response = self.llm.invoke(prompt)
+            llm_end = datetime.now()
             content = response.content.strip()
 
-            # Log LLM call to Langfuse with token usage
+            # Log LLM call to Langfuse with token usage and timing
             trace_id = getattr(self, "_current_trace_id", None)
             if trace_id and hasattr(response, 'usage_metadata'):
                 usage = response.usage_metadata
@@ -275,6 +279,8 @@ class AnalysisAgent:
                     output_text=content,
                     input_tokens=usage.get('input_tokens', 0),
                     output_tokens=usage.get('output_tokens', 0),
+                    start_time=llm_start,
+                    end_time=llm_end,
                 )
 
             # DEBUG: Log raw LLM response
