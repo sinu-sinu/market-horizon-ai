@@ -34,3 +34,6 @@ tmp/
 # additional files
 /plan/
 outputs/reports/
+
+data/history.db
+outputs/debug/
