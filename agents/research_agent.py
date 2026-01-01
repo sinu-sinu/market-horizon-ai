@@ -3,8 +3,10 @@ import aiohttp
 import asyncio
 from pytrends.request import TrendReq
 import praw
-from typing import Dict, List
+from typing import Dict, List, Optional
+from datetime import datetime
 from core.config import config
+from core.observability import _active_trace_ids, get_langfuse_client, create_span, end_span
 from utils.error_handler import retry_on_failure
 from utils.cache_manager import get_cache_manager, CacheManager
 import logging
@@ -56,18 +58,42 @@ class ResearchAgent:
 
         # Thread pool executor for running non-async libraries (pytrends, praw)
         self.executor = ThreadPoolExecutor(max_workers=3)
+
+    def _trace_api_call(self, name: str, input_data: dict, output_data: dict, duration_ms: float):
+        """
+        Log an API call to Langfuse as a span (v3 API)
+
+        Args:
+            name: Name of the API call (e.g., "serper_web_search")
+            input_data: Input data sent to the API
+            output_data: Response from the API
+            duration_ms: Duration in milliseconds
+        """
+        trace_id = getattr(self, "_current_trace_id", None)
+        if not trace_id or trace_id not in _active_trace_ids:
+            return
+
+        try:
+            # Create span, update with output, and end it
+            span = create_span(trace_id, name, input_data)
+            if span:
+                end_span(span, {**output_data, "duration_ms": duration_ms})
+        except Exception as e:
+            logger.debug(f"Failed to trace API call {name}: {e}")
     
     @retry_on_failure
-    def run(self, query: str) -> Dict:
+    def run(self, query: str, trace_id: Optional[str] = None) -> Dict:
         """
         Execute research pipeline with parallel API calls and caching
 
         Args:
             query: User's search query
+            trace_id: Optional Langfuse trace ID for observability
 
         Returns:
             Dict containing sources, trends, discussions, and metadata
         """
+        self._current_trace_id = trace_id
         logger.info(f"Research Agent: Processing query '{query}'")
 
         # Check cache first
@@ -156,12 +182,20 @@ class ResearchAgent:
         Returns:
             List of web sources with title, snippet, URL, date
         """
+        start_time = datetime.now()
         try:
             # Check cache first
             cache_key = self.cache._make_key("web_search", query=query)
             cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_WEB)
             if cached_result:
                 logger.debug(f"Web search CACHE HIT for query '{query}'")
+                duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                self._trace_api_call(
+                    "serper_web_search",
+                    {"query": query, "cached": True},
+                    {"results_count": len(cached_result)},
+                    duration_ms
+                )
                 return cached_result
 
             # Serper.dev API endpoint
@@ -203,10 +237,26 @@ class ResearchAgent:
                 query=query
             )
 
+            # Trace the API call
+            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            self._trace_api_call(
+                "serper_web_search",
+                {"query": query, "num_requested": 20},
+                {"results_count": len(sources)},
+                duration_ms
+            )
+
             logger.info(f"Serper.dev API: Retrieved {len(sources)} web results")
             return sources
 
         except Exception as e:
+            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            self._trace_api_call(
+                "serper_web_search",
+                {"query": query},
+                {"error": str(e)},
+                duration_ms
+            )
             logger.error(f"Serper.dev API error: {e}", exc_info=True)
             return []
     
@@ -233,12 +283,20 @@ class ResearchAgent:
         Returns:
             Dict with trend data and average interest
         """
+        start_time = datetime.now()
         try:
             # Check cache first
             cache_key = self.cache._make_key("trends", query=query)
             cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_TRENDS)
             if cached_result:
                 logger.debug(f"Trends CACHE HIT for query '{query}'")
+                duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                self._trace_api_call(
+                    "google_trends",
+                    {"query": query, "cached": True},
+                    {"average_interest": cached_result.get("average_interest", 0)},
+                    duration_ms
+                )
                 return cached_result
 
             # Build payload for last 3 months
@@ -269,14 +327,37 @@ class ResearchAgent:
                     query=query
                 )
 
+                # Trace the API call
+                duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                self._trace_api_call(
+                    "google_trends",
+                    {"query": query, "timeframe": "today 3-m"},
+                    {"average_interest": avg_interest, "data_points": len(trend_dict)},
+                    duration_ms
+                )
+
                 logger.info(f"Google Trends: Average interest {avg_interest:.1f}/100")
                 return result
             else:
+                duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                self._trace_api_call(
+                    "google_trends",
+                    {"query": query},
+                    {"no_data": True},
+                    duration_ms
+                )
                 logger.warning("Google Trends: No data available")
                 return {}
 
         except Exception as e:
+            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
             error_str = str(e)
+            self._trace_api_call(
+                "google_trends",
+                {"query": query},
+                {"error": error_str},
+                duration_ms
+            )
             # Handle rate limiting (429 errors) gracefully
             if "429" in error_str or "rate limit" in error_str.lower():
                 logger.warning(f"Google Trends API rate limit exceeded, skipping trends data")
@@ -309,6 +390,7 @@ class ResearchAgent:
         Returns:
             List of Reddit posts with metadata
         """
+        start_time = datetime.now()
         if not self.reddit_client:
             logger.debug("Reddit API not configured, skipping")
             return []
@@ -319,6 +401,13 @@ class ResearchAgent:
             cached_result = self.cache.get(cache_key, CacheManager.CACHE_TYPE_REDDIT)
             if cached_result:
                 logger.debug(f"Reddit search CACHE HIT for query '{query}'")
+                duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                self._trace_api_call(
+                    "reddit_search",
+                    {"query": query, "cached": True},
+                    {"discussions_count": len(cached_result)},
+                    duration_ms
+                )
                 return cached_result
 
             discussions = []
@@ -343,10 +432,26 @@ class ResearchAgent:
                 query=query
             )
 
+            # Trace the API call
+            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            self._trace_api_call(
+                "reddit_search",
+                {"query": query, "limit": limit},
+                {"discussions_count": len(discussions)},
+                duration_ms
+            )
+
             logger.info(f"Reddit API: Retrieved {len(discussions)} discussions")
             return discussions
 
         except Exception as e:
+            duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+            self._trace_api_call(
+                "reddit_search",
+                {"query": query},
+                {"error": str(e)},
+                duration_ms
+            )
             logger.warning(f"Reddit API error: {e}")
             return []
 
