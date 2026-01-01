@@ -55,7 +55,6 @@ class CacheManager:
         """
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.RLock()
 
         # Initialize database
         self._init_db()
@@ -161,41 +160,40 @@ class CacheManager:
             Cached value or None if not found/expired
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
 
-                    # Get value if not expired
-                    query = "SELECT value, hits FROM cache WHERE key = ? AND expires_at > ?"
-                    params = [key, datetime.now()]
+                # Get value if not expired
+                query = "SELECT value, hits FROM cache WHERE key = ? AND expires_at > ?"
+                params = [key, datetime.now()]
 
-                    if cache_type:
-                        query += " AND cache_type = ?"
-                        params.append(cache_type)
+                if cache_type:
+                    query += " AND cache_type = ?"
+                    params.append(cache_type)
 
-                    cursor.execute(query, params)
-                    row = cursor.fetchone()
+                cursor.execute(query, params)
+                row = cursor.fetchone()
 
-                    if row:
-                        # Update hit count
-                        cursor.execute(
-                            "UPDATE cache SET hits = hits + 1 WHERE key = ?",
-                            [key]
-                        )
-                        conn.commit()
+                if row:
+                    # Update hit count (non-blocking)
+                    cursor.execute(
+                        "UPDATE cache SET hits = hits + 1 WHERE key = ?",
+                        [key]
+                    )
+                    conn.commit()
 
-                        self.stats["hits"] += 1
-                        logger.debug(f"Cache HIT for key: {key}")
+                    self.stats["hits"] += 1
+                    logger.debug(f"Cache HIT for key: {key}")
 
-                        try:
-                            return json.loads(row[0])
-                        except (json.JSONDecodeError, TypeError):
-                            logger.warning(f"Failed to decode cache value for key: {key}")
-                            return None
-                    else:
-                        self.stats["misses"] += 1
-                        logger.debug(f"Cache MISS for key: {key}")
+                    try:
+                        return json.loads(row[0])
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning(f"Failed to decode cache value for key: {key}")
                         return None
+                else:
+                    self.stats["misses"] += 1
+                    logger.debug(f"Cache MISS for key: {key}")
+                    return None
 
         except Exception as e:
             logger.error(f"Error retrieving cache for key {key}: {e}")
@@ -235,18 +233,17 @@ class CacheManager:
 
             metadata_json = json.dumps(metadata) if metadata else None
 
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        """
-                        INSERT OR REPLACE INTO cache
-                        (key, cache_type, value, expires_at, query, metadata)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
-                        [key, cache_type, json_value, expires_at, query, metadata_json]
-                    )
-                    conn.commit()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO cache
+                    (key, cache_type, value, expires_at, query, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    [key, cache_type, json_value, expires_at, query, metadata_json]
+                )
+                conn.commit()
 
             self.stats["writes"] += 1
             logger.debug(
@@ -270,11 +267,10 @@ class CacheManager:
             True if successful, False otherwise
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM cache WHERE key = ?", [key])
-                    conn.commit()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM cache WHERE key = ?", [key])
+                conn.commit()
 
             self.stats["deletes"] += 1
             logger.debug(f"Cache DELETED for key: {key}")
@@ -296,12 +292,11 @@ class CacheManager:
             Number of entries deleted
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM cache WHERE cache_type = ?", [cache_type])
-                    conn.commit()
-                    deleted = cursor.rowcount
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM cache WHERE cache_type = ?", [cache_type])
+                conn.commit()
+                deleted = cursor.rowcount
 
             self.stats["deletes"] += deleted
             logger.info(f"Deleted {deleted} cache entries of type: {cache_type}")
@@ -323,12 +318,11 @@ class CacheManager:
             Number of entries deleted
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM cache WHERE query = ?", [query])
-                    conn.commit()
-                    deleted = cursor.rowcount
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM cache WHERE query = ?", [query])
+                conn.commit()
+                deleted = cursor.rowcount
 
             self.stats["deletes"] += deleted
             logger.info(f"Deleted {deleted} cache entries for query: {query}")
@@ -347,12 +341,11 @@ class CacheManager:
             Number of entries deleted
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("DELETE FROM cache")
-                    conn.commit()
-                    deleted = cursor.rowcount
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM cache")
+                conn.commit()
+                deleted = cursor.rowcount
 
             self.stats["deletes"] += deleted
             logger.warning(f"Cleared entire cache: {deleted} entries deleted")
@@ -371,15 +364,14 @@ class CacheManager:
             Number of entries deleted
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "DELETE FROM cache WHERE expires_at < ?",
-                        [datetime.now()]
-                    )
-                    conn.commit()
-                    deleted = cursor.rowcount
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM cache WHERE expires_at < ?",
+                    [datetime.now()]
+                )
+                conn.commit()
+                deleted = cursor.rowcount
 
             if deleted > 0:
                 logger.info(f"Cleanup removed {deleted} expired cache entries")
@@ -398,30 +390,29 @@ class CacheManager:
             Dictionary with cache statistics
         """
         try:
-            with self._lock:
-                with self._get_connection() as conn:
-                    cursor = conn.cursor()
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
 
-                    # Count total entries
-                    cursor.execute("SELECT COUNT(*) FROM cache WHERE expires_at > ?", [datetime.now()])
-                    total_valid = cursor.fetchone()[0]
+                # Count total entries
+                cursor.execute("SELECT COUNT(*) FROM cache WHERE expires_at > ?", [datetime.now()])
+                total_valid = cursor.fetchone()[0]
 
-                    # Count all entries
-                    cursor.execute("SELECT COUNT(*) FROM cache")
-                    total_all = cursor.fetchone()[0]
+                # Count all entries
+                cursor.execute("SELECT COUNT(*) FROM cache")
+                total_all = cursor.fetchone()[0]
 
-                    # Get size
-                    cursor.execute("SELECT SUM(LENGTH(value)) FROM cache")
-                    total_size = cursor.fetchone()[0] or 0
+                # Get size
+                cursor.execute("SELECT SUM(LENGTH(value)) FROM cache")
+                total_size = cursor.fetchone()[0] or 0
 
-                    # Get by type
-                    cursor.execute("""
-                        SELECT cache_type, COUNT(*), SUM(hits)
-                        FROM cache
-                        WHERE expires_at > ?
-                        GROUP BY cache_type
-                    """, [datetime.now()])
-                    by_type = cursor.fetchall()
+                # Get by type
+                cursor.execute("""
+                    SELECT cache_type, COUNT(*), SUM(hits)
+                    FROM cache
+                    WHERE expires_at > ?
+                    GROUP BY cache_type
+                """, [datetime.now()])
+                by_type = cursor.fetchall()
 
             hit_rate = (
                 (self.stats["hits"] / (self.stats["hits"] + self.stats["misses"]) * 100)
