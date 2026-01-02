@@ -1,10 +1,10 @@
 # Market Horizon AI - Complete Stack
-# Lumina Frontend + FastAPI Backend + Streamlit App + Langfuse Observability
+# Vue Frontend + FastAPI Backend + Langfuse Observability
 
 name: market-horizon
 
 services:
-  # ==================== LUMINA (Vue + FastAPI) ====================
+  # ==================== APPLICATION ====================
 
   # Vue Frontend (Nginx)
   frontend:
@@ -63,45 +63,6 @@ services:
       timeout: 10s
       start_period: 30s
       retries: 3
-    networks:
-      - mh-network
-
-  # ==================== STREAMLIT (Legacy) ====================
-
-  # Streamlit Application (renamed from 'app' to 'streamlit')
-  streamlit:
-    build: .
-    container_name: mh-streamlit
-    restart: unless-stopped
-    ports:
-      - "8501:8501"
-    environment:
-      # OpenAI
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # Serper
-      - SERPER_API_KEY=${SERPER_API_KEY}
-      # Reddit (optional)
-      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID:-}
-      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET:-}
-      - REDDIT_USER_AGENT=${REDDIT_USER_AGENT:-MarketHorizonAI/1.0}
-      # YouTube (optional)
-      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
-      # Langfuse
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - LANGFUSE_HOST=http://langfuse:3000
-      - LANGFUSE_ENABLED=true
-      # App settings
-      - APP_ENV=production
-      - LOG_LEVEL=INFO
-      - KMP_DUPLICATE_LIB_OK=TRUE
-    volumes:
-      # Persist data (shared with API)
-      - mh_data:/app/data
-      - mh_outputs:/app/outputs
-    depends_on:
-      langfuse:
-        condition: service_started
     networks:
       - mh-network
 
