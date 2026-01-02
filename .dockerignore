@@ -38,12 +38,14 @@ outputs/
 # Cache
 .pytest_cache/
 .cache/
+.claude/
 
 # Logs
 *.log
 
 # Docker
 Dockerfile
+Dockerfile.*
 docker-compose*.yml
 .dockerignore
 
@@ -54,3 +56,8 @@ plan/
 
 # Tests
 tests/
+
+# Frontend (handled by frontend's own Dockerfile)
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
