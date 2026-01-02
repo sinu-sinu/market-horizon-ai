@@ -44,10 +44,10 @@ class QualityAgent:
         self._current_trace_id = trace_id
         logger.info("Quality Agent: Validating outputs")
         
-        # Extract outputs from state
-        research_data = state.get("research_data", {})
-        analysis = state.get("analysis_insights", {})
-        strategy = state.get("strategy_recommendations", {})
+        # Extract outputs from state (handle None values)
+        research_data = state.get("research_data") or {}
+        analysis = state.get("analysis_insights") or {}
+        strategy = state.get("strategy_recommendations") or {}
         
         # Validate each component
         validation_results = {
@@ -101,6 +101,17 @@ class QualityAgent:
         Returns:
             Validation result dict
         """
+        # Handle None research_data
+        if research_data is None:
+            return {
+                "valid": False,
+                "source_count": 0,
+                "source_count_valid": False,
+                "diversity_valid": False,
+                "recency_valid": False,
+                "issues": ["No research data available"]
+            }
+        
         sources = research_data.get("sources", [])
         issues = []
         

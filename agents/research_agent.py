@@ -1,6 +1,8 @@
 import requests
 import aiohttp
 import asyncio
+import concurrent.futures
+import threading
 from pytrends.request import TrendReq
 import praw
 from typing import Dict, List, Optional
@@ -104,14 +106,38 @@ class ResearchAgent:
             return cached_result
 
         # Run async operations
+        # Check if there's already a running event loop (e.g., from FastAPI/uvicorn)
         try:
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, we need to run this in a separate thread
+            # Create a new event loop in a separate thread
+            result_future = concurrent.futures.Future()
+            
+            def run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    result = new_loop.run_until_complete(self._run_parallel(query))
+                    result_future.set_result(result)
+                except Exception as e:
+                    result_future.set_exception(e)
+                finally:
+                    new_loop.close()
+            
+            thread = threading.Thread(target=run_in_thread)
+            thread.start()
+            thread.join()
+            web_results, trends_data, reddit_data = result_future.result()
+        except RuntimeError:
+            # No running loop, create a new one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            web_results, trends_data, reddit_data = loop.run_until_complete(
-                self._run_parallel(query)
-            )
-        finally:
-            loop.close()
+            try:
+                web_results, trends_data, reddit_data = loop.run_until_complete(
+                    self._run_parallel(query)
+                )
+            finally:
+                loop.close()
 
         # Structure output
         output = {
