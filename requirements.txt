@@ -33,6 +33,11 @@ google-api-python-client==2.186.0
 # NLP
 vaderSentiment==3.3.2
 
+# API Server
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic-settings>=2.10.1
+
 # Testing
 pytest==8.3.5
 pytest-mock==3.14.0
