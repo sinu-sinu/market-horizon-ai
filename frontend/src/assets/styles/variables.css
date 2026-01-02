@@ -1,0 +1,134 @@
+:root {
+  /* Brand colors - Lumina palette */
+  --lumina-black: #0a0a0a;
+  --lumina-charcoal: #141414;
+  --lumina-slate: #1e1e1e;
+  --lumina-graphite: #2a2a2a;
+  --lumina-gray: #6b6b6b;
+  --lumina-silver: #9a9a9a;
+  --lumina-mist: #d4d4d4;
+  --lumina-white: #fafafa;
+
+  /* Accent colors */
+  --lumina-lime: #c8ff00;
+  --lumina-lime-soft: #d4ff4d;
+  --lumina-lime-dim: #a3cc00;
+  --lumina-teal: #00d4aa;
+  --lumina-coral: #ff6b6b;
+  --lumina-amber: #ffb84d;
+  --lumina-sky: #6bb3ff;
+
+  /* Semantic colors */
+  --color-success: var(--lumina-teal);
+  --color-success-bg: rgba(0, 212, 170, 0.1);
+  --color-warning: var(--lumina-amber);
+  --color-warning-bg: rgba(255, 184, 77, 0.1);
+  --color-error: var(--lumina-coral);
+  --color-error-bg: rgba(255, 107, 107, 0.1);
+  --color-info: var(--lumina-sky);
+  --color-info-bg: rgba(107, 179, 255, 0.1);
+
+  /* Background layers */
+  --bg-primary: var(--lumina-black);
+  --bg-secondary: var(--lumina-charcoal);
+  --bg-tertiary: var(--lumina-slate);
+  --bg-elevated: var(--lumina-graphite);
+  --bg-chat: #f5f5f3;
+  --bg-chat-elevated: #ffffff;
+
+  /* Text colors */
+  --text-primary: var(--lumina-white);
+  --text-secondary: var(--lumina-silver);
+  --text-muted: var(--lumina-gray);
+  --text-dark: var(--lumina-black);
+  --text-dark-secondary: #4a4a4a;
+
+  /* Typography */
+  --font-display: 'Satoshi', system-ui, -apple-system, sans-serif;
+  --font-body: 'General Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Font sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.5rem;
+  --text-5xl: 3rem;
+
+  /* Font weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-black: 900;
+
+  /* Line heights */
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.8;
+
+  /* Letter spacing */
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+
+  /* Spacing */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(200, 255, 0, 0.3);
+  --shadow-glow-sm: 0 0 10px rgba(200, 255, 0, 0.2);
+  --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Layout */
+  --sidebar-width: 280px;
+  --sidebar-collapsed: 72px;
+  --right-sidebar-width: 320px;
+  --header-height: 64px;
+  --input-height: 56px;
+
+  /* Z-index layers */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-tooltip: 600;
+}
