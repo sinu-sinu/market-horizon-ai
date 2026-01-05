@@ -187,20 +187,67 @@ class QualityAgent:
         if not competitors_valid:
             issues.append(f"Insufficient validated competitors ({len(validated_competitors)}/2 minimum)")
 
-        # Validate themes
+        # Validate themes (Phase 6: Check quality, not just existence)
         themes = analysis.get("content_themes", [])
         themes_valid = len(themes) > 0
         if not themes_valid:
             issues.append("No content themes identified")
 
+        # Phase 6: Validate theme quality
+        theme_quality_issues = self._validate_theme_quality(themes)
+        issues.extend(theme_quality_issues)
+
         return {
-            "valid": competitors_valid and themes_valid,
+            "valid": competitors_valid and themes_valid and len(theme_quality_issues) == 0,
             "validated_competitors": validated_competitors,
             "competitor_count": len(competitors),
             "competitors_valid": competitors_valid,
             "themes_valid": themes_valid,
+            "theme_quality_issues": theme_quality_issues,
             "issues": issues
         }
+
+    def _validate_theme_quality(self, themes: List[Dict]) -> List[str]:
+        """
+        Validate theme quality (Phase 6 - output quality validation)
+
+        Checks:
+        - Themes are multi-word (not single tokens)
+        - Themes have source evidence
+        - Sentiment has contextual attribution
+
+        Args:
+            themes: List of theme dictionaries
+
+        Returns:
+            List of quality issue strings
+        """
+        issues = []
+
+        for theme in themes:
+            theme_name = theme.get("theme", "")
+
+            # Check 1: Theme is multi-word
+            word_count = len(theme_name.split())
+            if word_count < 2:
+                issues.append(f"Single-word theme detected: '{theme_name}'")
+
+            # Check 2: Theme has source evidence
+            source_evidence = theme.get("source_evidence", [])
+            if not source_evidence:
+                issues.append(f"Theme '{theme_name[:30]}' has no source evidence")
+
+            # Check 3: Sentiment has contextual attribution
+            sentiment_summary = theme.get("sentiment_summary", "")
+            sentiment_signals = theme.get("sentiment_signals", [])
+
+            if not sentiment_summary or len(sentiment_summary) < 10:
+                issues.append(f"Theme '{theme_name[:30]}' has no sentiment summary")
+
+            if not sentiment_signals:
+                issues.append(f"Theme '{theme_name[:30]}' has no sentiment signals")
+
+        return issues
 
     def _calculate_competitor_confidence(self, competitor: str, sources: List[Dict]) -> float:
         """
@@ -248,52 +295,107 @@ class QualityAgent:
     
     def _validate_strategy(self, strategy: Dict, analysis: Dict) -> Dict:
         """
-        Validate strategy recommendations
-        
+        Validate strategy recommendations (Phase 6: quality validation)
+
         Args:
             strategy: Output from Strategy Agent
             analysis: Analysis insights
-            
+
         Returns:
             Validation result dict
         """
         issues = []
-        
+
         # Validate positioning map
         positioning = strategy.get("positioning_map", {})
         companies_positioned = positioning.get("companies", {})
         competitors_identified = analysis.get("competitors", [])
-        
+
         if competitors_identified:
             coverage = len(companies_positioned) / len(competitors_identified)
         else:
             coverage = 0.0
-        
+
         # More lenient: at least 40% coverage instead of 50%
         positioning_valid = coverage >= 0.4
         if not positioning_valid and len(competitors_identified) > 0:
             issues.append(f"Low positioning coverage ({coverage:.0%})")
-        
+
         # Validate recommendations exist
         content_recs = strategy.get("content_recommendations", [])
         recommendations_valid = len(content_recs) > 0
         if not recommendations_valid:
             issues.append("No content recommendations generated")
-        
+
+        # Phase 6: Validate recommendation quality
+        rec_quality_issues = self._validate_recommendation_quality(content_recs)
+        issues.extend(rec_quality_issues)
+
         # Validate strategic moves exist
         strategic_moves = strategy.get("strategic_moves", [])
         moves_valid = len(strategic_moves) > 0
         if not moves_valid:
             issues.append("No strategic moves generated")
-        
+
         return {
-            "valid": positioning_valid and recommendations_valid and moves_valid,
+            "valid": positioning_valid and recommendations_valid and moves_valid and len(rec_quality_issues) == 0,
             "positioning_coverage": coverage,
             "positioning_valid": positioning_valid,
             "recommendations_valid": recommendations_valid,
+            "recommendation_quality_issues": rec_quality_issues,
             "moves_valid": moves_valid,
             "issues": issues
         }
+
+    def _validate_recommendation_quality(self, recommendations: List[Dict]) -> List[str]:
+        """
+        Validate recommendation quality (Phase 6 - output quality validation)
+
+        Checks:
+        - No generic template recommendations
+        - Each has gap_reasoning
+        - Each has score_reasoning with sub-scores
+
+        Args:
+            recommendations: List of content recommendation dicts
+
+        Returns:
+            List of quality issue strings
+        """
+        issues = []
+
+        generic_patterns = [
+            "deep dive into",
+            "everything about",
+            "best practices for",
+            "complete guide to"
+        ]
+
+        for rec in recommendations:
+            topic = rec.get("topic", "")
+            topic_lower = topic.lower()
+
+            # Check 1: No generic template patterns
+            for pattern in generic_patterns:
+                if pattern in topic_lower and len(topic.split()) < 8:
+                    issues.append(f"Generic template recommendation: '{topic[:50]}'")
+                    break
+
+            # Check 2: Has gap_reasoning
+            gap_reasoning = rec.get("gap_reasoning", "")
+            if not gap_reasoning or len(gap_reasoning) < 10:
+                issues.append(f"Recommendation '{topic[:40]}' has no gap_reasoning")
+
+            # Check 3: Has score_reasoning with sub-scores
+            score_reasoning = rec.get("score_reasoning", {})
+            if isinstance(score_reasoning, dict):
+                if "error" not in score_reasoning and "note" not in score_reasoning:
+                    required_scores = ["demand_signal", "competitive_gap", "actionability"]
+                    missing = [s for s in required_scores if s not in score_reasoning]
+                    if missing:
+                        issues.append(f"Recommendation '{topic[:40]}' missing score components: {missing}")
+
+        return issues
     
     def _calculate_confidence(self, validation: Dict, research_data: Dict) -> float:
         """
