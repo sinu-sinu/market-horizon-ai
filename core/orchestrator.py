@@ -126,9 +126,10 @@ class AgentOrchestrator:
         logger.info("Strategy Agent: Generating recommendations")
 
         trace_id = state.get("trace_id")
+        query = state.get("query", "")  # Pass query for content gap analysis
         with Span(trace_id, "strategy_agent", input_data={"has_analysis_insights": bool(state.get("analysis_insights"))}) as span:
             try:
-                result = self.strategy_agent.run(state["analysis_insights"], trace_id=trace_id)
+                result = self.strategy_agent.run(state["analysis_insights"], trace_id=trace_id, query=query)
                 state["strategy_recommendations"] = result
                 state["api_calls"] += 1
                 logger.info("Strategy Agent: Completed successfully")
