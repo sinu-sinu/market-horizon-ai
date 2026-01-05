@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
-from core.prompts import POSITIONING_PROMPT, CONTENT_GAP_PROMPT, STRATEGIC_MOVES_PROMPT
+from core.prompts import POSITIONING_PROMPT, CONTENT_GAP_PROMPT, STRATEGIC_MOVES_PROMPT, CONTENT_GAP_ANALYSIS_PROMPT, OPPORTUNITY_SCORING_PROMPT
 from core.config import config
 from core.observability import log_llm_call
 from typing import Dict, List, Optional
@@ -34,48 +34,59 @@ class StrategyAgent:
         
         logger.info("Strategy Agent initialized with gpt-4.1-mini")
     
-    def run(self, analysis_insights: Dict, trace_id: Optional[str] = None) -> Dict:
+    def run(self, analysis_insights: Dict, trace_id: Optional[str] = None, query: str = "") -> Dict:
         """
         Generate positioning strategies and recommendations
 
         Args:
             analysis_insights: Output from Analysis Agent
             trace_id: Optional Langfuse trace ID for observability
+            query: Original search query for context
 
         Returns:
             Dict with positioning map, opportunity zones, and recommendations
         """
         self._current_trace_id = trace_id
+        self._query = query
         logger.info("Strategy Agent: Generating recommendations")
-        
+
         if not analysis_insights or not analysis_insights.get("competitors"):
             logger.warning("No analysis insights available")
             return self._empty_output()
-        
+
         # Generate positioning map
         positioning_map = self._generate_positioning_map(
             analysis_insights.get("competitor_attributes", {}),
             analysis_insights.get("competitors", [])
         )
-        
+
         # Identify opportunity zones
         opportunity_zones = self._detect_opportunity_zones(
             positioning_map,
             analysis_insights
         )
-        
-        # Generate content recommendations
+
+        # Generate content recommendations (Phase 3: LLM-based gap analysis)
         content_recs = self._generate_content_recommendations(
             analysis_insights.get("content_themes", []),
-            analysis_insights.get("competitors", [])
+            analysis_insights.get("competitors", []),
+            query=query
         )
-        
+
+        # Score recommendations with evidence-based reasoning (Phase 4)
+        if content_recs:
+            content_recs = self._score_recommendations(
+                content_recs,
+                analysis_insights.get("content_themes", []),
+                analysis_insights.get("competitors", [])
+            )
+
         # Strategic moves
         strategic_moves = self._generate_strategic_moves(
             positioning_map,
             opportunity_zones
         )
-        
+
         output = {
             "positioning_map": positioning_map,
             "opportunity_zones": opportunity_zones,
@@ -307,116 +318,233 @@ class StrategyAgent:
         logger.info(f"Identified {len(zones)} opportunity zones")
         return zones
     
-    def _generate_content_recommendations(self, themes: List[Dict], competitors: List[str]) -> List[Dict]:
+    def _generate_content_recommendations(self, themes: List[Dict], competitors: List[str], query: str = "") -> List[Dict]:
         """
-        Generate content gap recommendations
+        Generate content gap recommendations using LLM-based gap analysis (Phase 3)
 
         Args:
-            themes: Content themes from Analysis Agent
+            themes: Content themes from Analysis Agent (with source_evidence)
+            competitors: List of competitors
+            query: Original search query for context
+
+        Returns:
+            List of content recommendation dicts with gap_reasoning
+        """
+        if not themes:
+            logger.warning("No themes available for content recommendations")
+            return []
+
+        # Build themes with evidence for LLM prompt
+        themes_with_evidence = []
+        for theme in themes[:5]:
+            theme_info = {
+                "theme": theme.get("theme", ""),
+                "user_interest": theme.get("user_interest", ""),
+                "source_evidence": theme.get("source_evidence", [])
+            }
+            themes_with_evidence.append(theme_info)
+
+        # Format prompt
+        prompt = CONTENT_GAP_ANALYSIS_PROMPT.format(
+            query=query or "market research",
+            themes_with_evidence=json.dumps(themes_with_evidence, indent=2),
+            competitors=", ".join(competitors[:10])  # Limit to 10 competitors
+        )
+
+        try:
+            # Call LLM for gap analysis
+            llm_start = datetime.now()
+            response = self.llm.invoke(prompt)
+            llm_end = datetime.now()
+            content = response.content.strip()
+
+            # Log LLM call to Langfuse
+            trace_id = getattr(self, "_current_trace_id", None)
+            if trace_id and hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                log_llm_call(
+                    trace_id=trace_id,
+                    name="content-gap-analysis",
+                    model=model_name,
+                    input_text=prompt,
+                    output_text=content,
+                    input_tokens=usage.get('input_tokens', 0),
+                    output_tokens=usage.get('output_tokens', 0),
+                    start_time=llm_start,
+                    end_time=llm_end,
+                )
+
+            # Parse JSON response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(content)
+            llm_recommendations = result.get("recommendations", [])
+
+            # Transform to output format
+            recommendations = []
+            for i, rec in enumerate(llm_recommendations[:5]):
+                topic = rec.get("topic", "")
+
+                # Validate: topic should not be generic template
+                if self._is_generic_topic(topic):
+                    logger.warning(f"Skipping generic topic: {topic}")
+                    continue
+
+                recommendations.append({
+                    "topic": topic,
+                    "gap_reasoning": rec.get("gap_reasoning", ""),
+                    "target_audience": rec.get("target_audience", ""),
+                    "recommended_format": rec.get("recommended_format", "Article"),
+                    "format_rationale": rec.get("format_rationale", ""),
+                    "why_now": rec.get("why_now", ""),
+                    "priority": "high" if i < 2 else "medium" if i < 4 else "low",
+                    "estimated_effort": "medium"
+                })
+
+            logger.info(f"LLM generated {len(recommendations)} content recommendations")
+            return recommendations
+
+        except Exception as e:
+            logger.error(f"LLM content gap analysis failed: {e}")
+            return []
+
+    def _is_generic_topic(self, topic: str) -> bool:
+        """
+        Check if a topic is too generic (matches template patterns)
+
+        Args:
+            topic: Topic title to check
+
+        Returns:
+            True if topic is generic, False otherwise
+        """
+        topic_lower = topic.lower()
+
+        generic_patterns = [
+            "deep dive into",
+            "everything about",
+            "best practices for",
+            "complete guide to",
+            "all you need to know",
+            "introduction to",
+            "getting started with"
+        ]
+
+        # Check if topic matches generic patterns AND is short (under 8 words)
+        word_count = len(topic.split())
+        if word_count < 6:
+            for pattern in generic_patterns:
+                if pattern in topic_lower:
+                    return True
+
+        return False
+
+    def _score_recommendations(
+        self,
+        recommendations: List[Dict],
+        themes: List[Dict],
+        competitors: List[str]
+    ) -> List[Dict]:
+        """
+        Score recommendations using LLM-based evidence analysis (Phase 4)
+
+        Args:
+            recommendations: Content recommendations from gap analysis
+            themes: Content themes with source evidence
             competitors: List of competitors
 
         Returns:
-            List of content recommendation dicts
+            Recommendations with evidence-based opportunity scores
         """
-        recommendations = []
-
-        if not themes:
-            logger.warning("No themes available for content recommendations")
+        if not recommendations:
             return recommendations
 
-        # Generate recommendations based on themes
-        for theme in themes[:5]:  # Top 5 themes
-            # Calculate priority based on frequency
-            frequency = theme.get("frequency", 0)
-            priority = "high" if frequency > 10 else "medium" if frequency > 5 else "low"
+        # Build source evidence summary from themes
+        source_evidence = []
+        for theme in themes[:5]:
+            evidence = theme.get("source_evidence", [])
+            for e in evidence:
+                source_evidence.append({
+                    "theme": theme.get("theme", ""),
+                    "quote": e.get("quote", ""),
+                    "source_idx": e.get("source_idx")
+                })
 
-            # Calculate opportunity score
-            # Higher frequency and positive sentiment = higher opportunity
-            sentiment = theme.get("sentiment", 0.0)
-            opportunity_score = min(10.0, (frequency / 3.0) + (sentiment * 2) + 5.0)
+        # Format prompt
+        prompt = OPPORTUNITY_SCORING_PROMPT.format(
+            recommendations=json.dumps([
+                {"topic": r.get("topic", ""), "gap_reasoning": r.get("gap_reasoning", "")}
+                for r in recommendations
+            ], indent=2),
+            source_evidence=json.dumps(source_evidence[:20], indent=2),  # Limit evidence
+            competitors=", ".join(competitors[:10])
+        )
 
-            # Estimate search volume (simplified)
-            search_volume = frequency * 200  # Rough estimate
+        try:
+            # Call LLM for scoring
+            llm_start = datetime.now()
+            response = self.llm.invoke(prompt)
+            llm_end = datetime.now()
+            content = response.content.strip()
 
-            # Determine format based on theme
-            format_suggestion = self._suggest_content_format(theme["theme"])
+            # Log LLM call to Langfuse
+            trace_id = getattr(self, "_current_trace_id", None)
+            if trace_id and hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                log_llm_call(
+                    trace_id=trace_id,
+                    name="opportunity-scoring",
+                    model=model_name,
+                    input_text=prompt,
+                    output_text=content,
+                    input_tokens=usage.get('input_tokens', 0),
+                    output_tokens=usage.get('output_tokens', 0),
+                    start_time=llm_start,
+                    end_time=llm_end,
+                )
 
-            # Generate more specific topic title
-            topic_title = self._generate_topic_title(theme["theme"])
+            # Parse JSON response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
 
-            recommendations.append({
-                "topic": topic_title,
-                "priority": priority,
-                "opportunity_score": round(opportunity_score, 1),
-                "search_volume_monthly": search_volume,
-                "competitor_coverage": f"Limited coverage by {len(competitors)} competitors",
-                "recommended_format": format_suggestion,
-                "estimated_effort": "medium"
-            })
+            result = json.loads(content)
+            scored_recs = result.get("scored_recommendations", [])
 
-        # Sort by opportunity score
-        recommendations.sort(key=lambda x: x["opportunity_score"], reverse=True)
+            # Match scores back to original recommendations
+            score_map = {r.get("topic", "").lower(): r for r in scored_recs}
 
-        logger.info(f"Generated {len(recommendations)} content recommendations")
-        return recommendations
-    
-    def _generate_topic_title(self, theme: str) -> str:
-        """
-        Generate specific, actionable topic titles instead of generic "X best practices"
+            for rec in recommendations:
+                topic_lower = rec.get("topic", "").lower()
+                if topic_lower in score_map:
+                    scored = score_map[topic_lower]
+                    rec["opportunity_score"] = scored.get("opportunity_score", 5.0)
+                    rec["score_reasoning"] = scored.get("score_reasoning", {})
+                else:
+                    # Fallback if no match found
+                    rec["opportunity_score"] = 5.0
+                    rec["score_reasoning"] = {"note": "Score not computed"}
 
-        Args:
-            theme: Theme name
+            # Sort by opportunity score
+            recommendations.sort(key=lambda x: x.get("opportunity_score", 0), reverse=True)
 
-        Returns:
-            More specific topic title
-        """
-        theme_lower = theme.lower()
+            logger.info(f"Scored {len(recommendations)} recommendations with evidence-based reasoning")
+            return recommendations
 
-        # Map themes to more specific content ideas
-        if any(word in theme_lower for word in ["integration", "api", "connect"]):
-            return f"How to integrate {theme} with your workflow"
-        elif any(word in theme_lower for word in ["pricing", "cost", "budget"]):
-            return f"{theme}: ROI analysis and cost comparison"
-        elif any(word in theme_lower for word in ["setup", "install", "config"]):
-            return f"Complete {theme} setup guide for beginners"
-        elif any(word in theme_lower for word in ["security", "privacy", "compliance"]):
-            return f"{theme} security & compliance checklist"
-        elif any(word in theme_lower for word in ["migration", "switch", "move"]):
-            return f"How to migrate to {theme} without downtime"
-        elif any(word in theme_lower for word in ["vs", "comparison", "difference"]):
-            return f"{theme}: comparison with alternatives"
-        elif any(word in theme_lower for word in ["trend", "future", "emerging"]):
-            return f"The future of {theme}: 2024+ trends"
-        elif any(word in theme_lower for word in ["performance", "speed", "optimization"]):
-            return f"Optimizing {theme} for maximum performance"
-        else:
-            return f"Deep dive into {theme}"
+        except Exception as e:
+            logger.error(f"LLM opportunity scoring failed: {e}")
+            # Return recommendations without scores
+            for rec in recommendations:
+                rec["opportunity_score"] = 5.0
+                rec["score_reasoning"] = {"error": str(e)}
+            return recommendations
 
-    def _suggest_content_format(self, theme: str) -> str:
-        """
-        Suggest content format based on theme
-
-        Args:
-            theme: Theme name
-
-        Returns:
-            Suggested format string
-        """
-        theme_lower = theme.lower()
-
-        if any(word in theme_lower for word in ["how", "guide", "tutorial", "setup", "install"]):
-            return "Tutorial"
-        elif any(word in theme_lower for word in ["comparison", "vs", "versus"]):
-            return "Comparison"
-        elif any(word in theme_lower for word in ["best", "top", "review"]):
-            return "Review/Roundup"
-        elif any(word in theme_lower for word in ["case", "study", "example"]):
-            return "Case Study"
-        elif any(word in theme_lower for word in ["security", "compliance", "checklist"]):
-            return "Checklist"
-        else:
-            return "Article"
-    
     def _generate_strategic_moves(self, positioning_map: Dict, zones: List[Dict]) -> List[str]:
         """
         Generate strategic recommendations
