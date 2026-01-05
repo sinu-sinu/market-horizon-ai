@@ -292,6 +292,236 @@ Highlight any unsupported claims that need additional research.
 """
 
 # ============================================================================
+# THEME EXTRACTION PROMPT (Phase 1 Fix)
+# ============================================================================
+
+THEME_EXTRACTION_PROMPT = """
+You are analyzing search results to identify meaningful business concepts that users care about.
+
+Query context: {query}
+
+Source content to analyze:
+{source_content}
+
+Your task: Identify 5 distinct BUSINESS CONCEPTS discussed across these sources.
+
+RULES FOR GOOD THEMES:
+1. Each theme MUST be a multi-word phrase (2-5 words) representing a specific topic
+2. Themes must be DISTINCT from each other (no overlapping concepts)
+3. Themes must NOT simply restate the query terms
+4. Themes must represent something users would want to learn about or solve
+
+GOOD THEME EXAMPLES:
+- "Lead scoring automation" (specific capability)
+- "CRM onboarding complexity" (specific pain point)
+- "Email deliverability rates" (specific metric users care about)
+- "Integration with marketing tools" (specific use case)
+- "Pricing transparency concerns" (specific user sentiment)
+
+BAD THEME EXAMPLES (DO NOT OUTPUT THESE):
+- "CRM" (single word, too generic)
+- "Software" (single word, obvious from context)
+- "Best tools" (restates query pattern)
+- "Features" (too vague, no specificity)
+- "Management" (single word, no context)
+
+For each theme, you MUST provide:
+1. The theme name (multi-word phrase)
+2. Source evidence: For each source that mentions this concept, extract the EXACT quote (10-30 words) that supports it
+3. A brief reason why users care about this topic
+
+Output ONLY valid JSON in this exact format:
+{{
+  "themes": [
+    {{
+      "theme": "Lead scoring automation",
+      "source_evidence": [
+        {{"source_idx": 0, "quote": "automated lead scoring helps prioritize high-value prospects"}},
+        {{"source_idx": 2, "quote": "scoring leads automatically saves hours of manual work"}}
+      ],
+      "user_interest": "Users want to prioritize leads without manual effort"
+    }},
+    {{
+      "theme": "CRM data migration challenges",
+      "source_evidence": [
+        {{"source_idx": 1, "quote": "migrating data between CRMs can take weeks"}},
+        {{"source_idx": 3, "quote": "data loss during migration is a major concern"}}
+      ],
+      "user_interest": "Switching CRMs is risky and users fear data loss"
+    }}
+  ]
+}}
+
+IMPORTANT: Each quote must be an ACTUAL substring from the source text, not a paraphrase.
+
+Analyze the sources and extract exactly 5 themes.
+"""
+
+# ============================================================================
+# CONTENT GAP ANALYSIS PROMPT (Phase 3 Fix)
+# ============================================================================
+
+CONTENT_GAP_ANALYSIS_PROMPT = """
+You are a content strategist analyzing market research to identify specific content opportunities.
+
+Query context: {query}
+
+Themes identified (with source evidence):
+{themes_with_evidence}
+
+Competitors in market:
+{competitors}
+
+Your task: For each theme, identify a SPECIFIC content gap and generate an actionable recommendation.
+
+A CONTENT GAP is something users want to know that existing content doesn't adequately address.
+
+For each recommendation, provide:
+1. topic: A specific, actionable article title (NOT generic like "Deep dive into X")
+2. gap_reasoning: What question do users have that competitors don't answer?
+3. target_audience: Who specifically would benefit from this content?
+4. format_rationale: Why this format is best (Tutorial, Comparison, Case Study, Checklist, Guide)
+5. why_now: What signals indicate this content is needed now?
+
+GOOD RECOMMENDATION EXAMPLES:
+- topic: "Step-by-step CRM data migration checklist: What to prepare before switching"
+  gap_reasoning: "Sources discuss migration difficulty but none provide actionable preparation steps"
+
+- topic: "HubSpot vs Salesforce for real estate teams under 10 agents: A cost analysis"
+  gap_reasoning: "Comparisons exist but none focus on small real estate team economics"
+
+BAD RECOMMENDATION EXAMPLES (DO NOT OUTPUT):
+- "Deep dive into CRM" (too generic)
+- "Everything about lead management" (not specific)
+- "CRM best practices" (doesn't address a gap)
+
+Output ONLY valid JSON in this exact format:
+{{
+  "recommendations": [
+    {{
+      "topic": "Specific, actionable article title",
+      "gap_reasoning": "What's missing from existing content that users need",
+      "target_audience": "Specific audience segment",
+      "recommended_format": "Tutorial|Comparison|Case Study|Checklist|Guide",
+      "format_rationale": "Why this format serves the audience best",
+      "why_now": "What signals indicate this content is timely"
+    }}
+  ]
+}}
+
+Generate exactly 5 recommendations, one per theme.
+"""
+
+# ============================================================================
+# OPPORTUNITY SCORING PROMPT (Phase 4 Fix)
+# ============================================================================
+
+OPPORTUNITY_SCORING_PROMPT = """
+You are evaluating content opportunities based on market evidence.
+
+For each content recommendation, provide an evidence-based opportunity score.
+
+Recommendations to score:
+{recommendations}
+
+Source evidence context:
+{source_evidence}
+
+Competitors in market:
+{competitors}
+
+For each recommendation, evaluate these dimensions (1-10 scale):
+
+1. **demand_signal** (1-10): How strongly do sources indicate user interest?
+   - 8-10: Multiple sources explicitly mention this as a pain point or frequent question
+   - 5-7: Some sources discuss this topic with engagement signals
+   - 1-4: Weak or no evidence of user demand
+
+2. **competitive_gap** (1-10): How underserved is this topic?
+   - 8-10: No competitors adequately address this; clear whitespace
+   - 5-7: Competitors touch on this but leave gaps
+   - 1-4: Well-covered by multiple competitors
+
+3. **actionability** (1-10): How easily can this content be created?
+   - 8-10: Clear format, well-defined scope, executable immediately
+   - 5-7: Moderate complexity, may need some research
+   - 1-4: Requires deep expertise or extensive research
+
+Calculate opportunity_score as weighted average:
+opportunity_score = (demand_signal * 0.4) + (competitive_gap * 0.4) + (actionability * 0.2)
+
+Output ONLY valid JSON:
+{{
+  "scored_recommendations": [
+    {{
+      "topic": "Original topic title",
+      "opportunity_score": 7.8,
+      "score_reasoning": {{
+        "demand_signal": 8,
+        "demand_evidence": "3 sources mention lead scoring as top pain point",
+        "competitive_gap": 7,
+        "gap_evidence": "Competitors discuss leads but not scoring mechanics",
+        "actionability": 9,
+        "actionability_reasoning": "Tutorial format, clear step-by-step structure possible"
+      }}
+    }}
+  ]
+}}
+
+Score all provided recommendations.
+"""
+
+# ============================================================================
+# CONTEXTUAL SENTIMENT PROMPT (Phase 5 Fix)
+# ============================================================================
+
+CONTEXTUAL_SENTIMENT_PROMPT = """
+You are analyzing sentiment in market research sources to provide contextual attribution.
+
+Theme to analyze: {theme}
+
+Source quotes mentioning this theme:
+{quotes}
+
+Your task: Analyze sentiment WITH context. Don't just say "positive" or "negative" - explain WHAT the sentiment is about and WHY.
+
+For each theme, provide:
+1. sentiment_summary: A readable sentence describing the overall sentiment (e.g., "Users praise the ease of use but criticize the pricing")
+2. sentiment_signals: List of specific sentiment observations with:
+   - subject: What specifically is the sentiment about?
+   - polarity: "positive", "negative", or "mixed"
+   - reason: Why do users feel this way? (quote or paraphrase from sources)
+
+GOOD SENTIMENT EXAMPLES:
+- subject: "HubSpot onboarding process"
+  polarity: "positive"
+  reason: "described as 'quick and intuitive' by multiple users"
+
+- subject: "Salesforce pricing"
+  polarity: "negative"
+  reason: "users mention it's 'expensive for small teams'"
+
+BAD SENTIMENT EXAMPLES (DO NOT OUTPUT):
+- subject: "CRM" (too vague)
+  polarity: "positive"
+  reason: "sources are positive" (no specific reason)
+
+Output ONLY valid JSON:
+{{
+  "sentiment_summary": "Users appreciate X but express concerns about Y",
+  "sentiment_signals": [
+    {{
+      "subject": "Specific feature or aspect",
+      "polarity": "positive|negative|mixed",
+      "reason": "Specific reason from sources"
+    }}
+  ]
+}}
+
+Provide 2-4 sentiment signals based on the source quotes.
+"""
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -319,5 +549,9 @@ __all__ = [
     'STRATEGIC_MOVES_PROMPT',
     'VALIDATION_PROMPT',
     'SOURCE_ATTRIBUTION_PROMPT',
+    'THEME_EXTRACTION_PROMPT',
+    'CONTENT_GAP_ANALYSIS_PROMPT',
+    'OPPORTUNITY_SCORING_PROMPT',
+    'CONTEXTUAL_SENTIMENT_PROMPT',
     'format_prompt'
 ]
