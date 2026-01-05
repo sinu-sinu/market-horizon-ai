@@ -106,7 +106,13 @@ class AnalysisAgent:
         
         # Extract insights
         competitors = self._identify_competitors(research_data["sources"])
-        themes = self._extract_themes(research_data["sources"])
+        query = research_data.get("query", "")
+        themes = self._extract_themes(research_data["sources"], query=query)
+
+        # Add contextual sentiment analysis (Phase 5)
+        if themes:
+            themes = self._add_contextual_sentiment(themes, research_data["sources"])
+
         competitor_attributes = self._analyze_competitors(
             competitors,
             vectorstore,
@@ -432,85 +438,212 @@ class AnalysisAgent:
         logger.info(f"Fallback extracted {len(result)} potential competitors")
         return result
     
-    def _extract_themes(self, sources: List[Dict]) -> List[Dict]:
+    def _extract_themes(self, sources: List[Dict], query: str = "") -> List[Dict]:
         """
-        Identify content themes using keyword frequency
-        
+        Identify content themes using LLM-based concept extraction
+
         Args:
             sources: List of source dictionaries
-            
+            query: Original search query for context
+
         Returns:
-            List of theme dictionaries
+            List of theme dictionaries with multi-word concepts
         """
-        # For MVP, use simple keyword counting
-        # In production, this would use clustering or topic modeling
-        
-        from collections import Counter
-        import re
-        
-        # Extended stop words to filter garbage themes
-        stop_words = set([
-            # Common articles and prepositions
-            'the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
-            'in', 'with', 'to', 'for', 'of', 'as', 'by', 'that', 'this',
-            'from', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 'had',
-            # Generic business terms that shouldn't be themes
-            'best', 'top', 'free', 'simple', 'easy', 'software', 'tool', 'tools',
-            'platform', 'solution', 'service', 'app', 'system', 'business',
-            'company', 'product', 'features', 'pricing', 'review', 'reviews',
-            # Common query words
-            'what', 'when', 'where', 'which', 'who', 'how', 'why',
-            'can', 'will', 'should', 'would', 'could', 'may', 'might',
-            'more', 'most', 'some', 'any', 'all', 'each', 'every',
-            'their', 'they', 'them', 'your', 'you', 'our', 'we', 'us'
-        ])
-        
-        # Extract all words
-        all_text = " ".join([
-            f"{s.get('title', '')} {s.get('snippet', '')}" 
-            for s in sources
-        ])
-        
-        # Clean and tokenize (lowercase, min 4 chars)
-        words = re.findall(r'\b[a-z]{4,}\b', all_text.lower())
+        from core.prompts import THEME_EXTRACTION_PROMPT
 
-        # Filter stop words and count
-        word_counts = Counter([
-            word for word in words
-            if word not in stop_words
-        ])
+        # Build source content for LLM analysis
+        source_content_parts = []
+        for idx, source in enumerate(sources[:15]):  # Limit to 15 sources
+            title = source.get('title', '')
+            snippet = source.get('snippet', '')
+            if title or snippet:
+                source_content_parts.append(f"[Source {idx}] {title}. {snippet}")
 
-        # DEBUG: Log theme extraction
-        logger.debug(f"Theme extraction: {len(word_counts)} unique words after filtering")
-        logger.debug(f"Top 10 themes: {word_counts.most_common(10)}")
-        
-        # Get top themes
-        themes = []
-        for word, count in word_counts.most_common(5):
-            # Calculate sentiment for this theme
-            theme_texts = [
-                s.get('snippet', '') 
-                for s in sources 
-                if word in s.get('snippet', '').lower()
-            ]
-            
-            sentiments = [
-                self.sentiment_analyzer.polarity_scores(text)['compound']
-                for text in theme_texts if text
-            ]
-            
-            avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0.0
-            
-            themes.append({
-                "theme": word.capitalize(),
-                "frequency": count,
-                "sentiment": round(avg_sentiment, 2),
-                "key_phrases": [word]  # Simplified for MVP
-            })
-        
-        logger.info(f"Extracted {len(themes)} content themes")
+        source_content = "\n\n".join(source_content_parts)
+
+        if not source_content.strip():
+            logger.warning("No source content for theme extraction")
+            return []
+
+        # Format the prompt
+        prompt = THEME_EXTRACTION_PROMPT.format(
+            query=query or "market research",
+            source_content=source_content
+        )
+
+        try:
+            # Call LLM for theme extraction
+            llm_start = datetime.now()
+            response = self.llm.invoke(prompt)
+            llm_end = datetime.now()
+            content = response.content.strip()
+
+            # Log LLM call to Langfuse
+            trace_id = getattr(self, "_current_trace_id", None)
+            if trace_id and hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                log_llm_call(
+                    trace_id=trace_id,
+                    name="theme-extraction",
+                    model=model_name,
+                    input_text=prompt,
+                    output_text=content,
+                    input_tokens=usage.get('input_tokens', 0),
+                    output_tokens=usage.get('output_tokens', 0),
+                    start_time=llm_start,
+                    end_time=llm_end,
+                )
+
+            # Parse JSON response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(content)
+            llm_themes = result.get("themes", [])
+
+            # Transform to output format with validation
+            themes = []
+            for item in llm_themes[:5]:  # Limit to 5 themes
+                theme_name = item.get("theme", "")
+
+                # Validate: must be multi-word (2+ words)
+                word_count = len(theme_name.split())
+                if word_count < 2:
+                    logger.warning(f"Skipping single-word theme: {theme_name}")
+                    continue
+
+                # Get source evidence (Phase 2)
+                source_evidence = item.get("source_evidence", [])
+                user_interest = item.get("user_interest", "")
+
+                # Extract source indices from evidence
+                source_indices = [e.get("source_idx") for e in source_evidence if "source_idx" in e]
+
+                # Calculate frequency based on source mentions
+                frequency = len(source_evidence) if source_evidence else 1
+
+                # Calculate sentiment for sources mentioning this theme
+                theme_texts = [
+                    sources[idx].get('snippet', '')
+                    for idx in source_indices
+                    if idx < len(sources) and sources[idx].get('snippet')
+                ]
+
+                sentiments = [
+                    self.sentiment_analyzer.polarity_scores(text)['compound']
+                    for text in theme_texts if text
+                ]
+                avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0.0
+
+                themes.append({
+                    "theme": theme_name,
+                    "frequency": frequency,
+                    "sentiment": round(avg_sentiment, 2),
+                    "source_indices": source_indices,
+                    "source_evidence": source_evidence,  # Phase 2: Include evidence
+                    "user_interest": user_interest
+                })
+
+            logger.info(f"LLM extracted {len(themes)} content themes")
+            return themes
+
+        except Exception as e:
+            logger.error(f"LLM theme extraction failed: {e}")
+            # Fallback to empty themes rather than garbage word frequency
+            return []
+
+    def _add_contextual_sentiment(self, themes: List[Dict], sources: List[Dict]) -> List[Dict]:
+        """
+        Add contextual sentiment analysis to themes (Phase 5)
+
+        Instead of bare numeric sentiment, provide:
+        - sentiment_summary: Readable sentence describing overall sentiment
+        - sentiment_signals: List of specific observations with subject/polarity/reason
+
+        Args:
+            themes: List of theme dictionaries with source_evidence
+            sources: Original source data
+
+        Returns:
+            Themes with contextual sentiment added
+        """
+        from core.prompts import CONTEXTUAL_SENTIMENT_PROMPT
+
+        for theme in themes:
+            theme_name = theme.get("theme", "")
+            source_evidence = theme.get("source_evidence", [])
+
+            # Collect quotes for this theme
+            quotes = []
+            for evidence in source_evidence:
+                quote = evidence.get("quote", "")
+                source_idx = evidence.get("source_idx")
+                if quote and source_idx is not None and source_idx < len(sources):
+                    source_title = sources[source_idx].get("title", "Unknown source")
+                    quotes.append(f"[{source_title}]: \"{quote}\"")
+
+            if not quotes:
+                # No quotes available, use default sentiment
+                theme["sentiment_summary"] = "Insufficient data for sentiment analysis"
+                theme["sentiment_signals"] = []
+                continue
+
+            # Format prompt
+            prompt = CONTEXTUAL_SENTIMENT_PROMPT.format(
+                theme=theme_name,
+                quotes="\n".join(quotes[:10])  # Limit to 10 quotes
+            )
+
+            try:
+                # Call LLM for contextual sentiment
+                llm_start = datetime.now()
+                response = self.llm.invoke(prompt)
+                llm_end = datetime.now()
+                content = response.content.strip()
+
+                # Log LLM call to Langfuse
+                trace_id = getattr(self, "_current_trace_id", None)
+                if trace_id and hasattr(response, 'usage_metadata'):
+                    usage = response.usage_metadata
+                    model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                    log_llm_call(
+                        trace_id=trace_id,
+                        name="contextual-sentiment",
+                        model=model_name,
+                        input_text=prompt,
+                        output_text=content,
+                        input_tokens=usage.get('input_tokens', 0),
+                        output_tokens=usage.get('output_tokens', 0),
+                        start_time=llm_start,
+                        end_time=llm_end,
+                    )
+
+                # Parse JSON response
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0].strip()
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0].strip()
+
+                result = json.loads(content)
+
+                # Add contextual sentiment to theme
+                theme["sentiment_summary"] = result.get("sentiment_summary", "")
+                theme["sentiment_signals"] = result.get("sentiment_signals", [])
+
+                # Keep numeric sentiment for backwards compatibility
+                # (already calculated during theme extraction)
+
+            except Exception as e:
+                logger.warning(f"Contextual sentiment analysis failed for '{theme_name}': {e}")
+                theme["sentiment_summary"] = "Sentiment analysis unavailable"
+                theme["sentiment_signals"] = []
+
+        logger.info(f"Added contextual sentiment to {len(themes)} themes")
         return themes
-    
+
     def _analyze_competitors(
         self, 
         competitors: List[str], 
