@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { useUserStore } from '@/stores'
 
-const userStore = useUserStore()
 </script>
 
 <template>
   <div class="chat-greeting animate-fade-in-up">
     <h1 class="greeting-title">
-      Hi, {{ userStore.displayName }}
+      Hi, welcome to Panorama
       <br />
       <span class="greeting-subtitle">What can I help you with?</span>
     </h1>
