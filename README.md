@@ -324,8 +324,8 @@ market-horizon-ai/
 
 ## Author
 
-**[Your Name]**
-_AI Engineer | Full-Stack Developer_
+**Sinu**
+_AI Engineer | ML Engineer_
 
 - GitHub: [@sinu-sinu](https://github.com/sinu-sinu)
 - LinkedIn: [linkedin.com/in/sinu-sinu](https://linkedin.com/in/sinu-sinu)
