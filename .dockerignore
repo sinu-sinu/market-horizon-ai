@@ -27,6 +27,7 @@ ENV/
 # Data (will be mounted as volumes)
 data/*.db
 data/faiss_index/
+data/history.db
 
 # Outputs (will be mounted as volumes)
 outputs/

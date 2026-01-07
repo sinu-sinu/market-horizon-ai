@@ -21,7 +21,9 @@ htmlcov/
 
 # Data / local databases
 /data/cache.db
+/data/history.db
 data/faiss_index/
+
 
 # OS-specific
 .DS_Store
