@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from datetime import datetime
 import logging
+import math
 
 try:
     from fuzzywuzzy import fuzz
@@ -399,45 +400,40 @@ class QualityAgent:
     
     def _calculate_confidence(self, validation: Dict, research_data: Dict) -> float:
         """
-        Calculate overall confidence score
+        Refactored Confidence Calculation
         
-        Args:
-            validation: Validation results from all agents
-            research_data: Original research data
-            
-        Returns:
-            Confidence score (0.0 - 1.0)
+        Logic: 
+        1. Source count uses LOGARITHMIC scaling to avoid the 88% plateau at 10 sources.
+        2. Weights are rebalanced to prioritize agent logic (Validation) over raw data volume.
         """
-        source_count = len(research_data.get("sources", []))
+        sources = research_data.get("sources", [])
+        source_count = len(sources)
         
-        # Source quality score (35% weight)
-        # Perfect at 15+ sources, scales linearly below that (more lenient)
-        source_score = min(1.0, source_count / 15.0)
+        # --- PART A: Logarithmic Source Score (20% weight) ---
+        # Reaches ~0.86 score for 10 sources (log 11 / log 16)
+        # Reaches 1.0 score for 15 sources (log 16 / log 16)
+        source_score = min(1.0, math.log(source_count + 1) / math.log(16)) if source_count > 0 else 0.0
         
-        # Validation score (50% weight)
-        # Based on how many validations passed
+        # --- PART B: Validation score (65% weight - increased from 50%) ---
+        # This reflects the actual success of your Analysis and Strategy agents
         validations_passed = sum(1 for v in validation.values() if v.get("valid", False))
         total_validations = len(validation)
         validation_score = validations_passed / total_validations if total_validations > 0 else 0.0
         
-        # Data quality bonus (15% weight)
-        # Reward for having trends data, discussions, etc.
+        # --- PART C: Data quality bonus (15% weight) ---
+        # Rewards extra features like trends and discussions
         data_quality_bonus = 0.0
-        if research_data.get("trends"):
-            data_quality_bonus += 0.5
-        if research_data.get("discussions"):
-            data_quality_bonus += 0.3
-        if source_count >= 10:
-            data_quality_bonus += 0.2
-        
+        if research_data.get("trends"): data_quality_bonus += 0.5
+        if research_data.get("discussions"): data_quality_bonus += 0.3
+        if source_count >= 10: data_quality_bonus += 0.2
         data_quality_score = min(1.0, data_quality_bonus)
         
-        # Weighted confidence with adjusted weights
-        confidence = (source_score * 0.35) + (validation_score * 0.50) + (data_quality_score * 0.15)
+        # --- FINAL CALCULATION ---
+        confidence = (source_score * 0.20) + (validation_score * 0.65) + (data_quality_score * 0.15)
         
-        # Ensure minimum confidence if we have decent data
-        if source_count >= 8 and validations_passed >= 1:
-            confidence = max(confidence, 0.65)
+        # Floor logic: If data is decent and logic passed, keep it above the threshold
+        if source_count >= 6 and validations_passed >= 2:
+            confidence = max(confidence, 0.70)
         
         return round(confidence, 2)
     
@@ -477,22 +473,6 @@ class QualityAgent:
             flags.append({
                 "type": "info",
                 "message": f"Good source count ({source_count}). Results are well-supported.",
-                "agent": "research"
-            })
-        
-        # Check if trends data available
-        if research_data.get("trends"):
-            flags.append({
-                "type": "info",
-                "message": "Trend data available for temporal analysis",
-                "agent": "research"
-            })
-        
-        # Check if Reddit data available
-        if research_data.get("discussions"):
-            flags.append({
-                "type": "info",
-                "message": f"Community insights from {len(research_data['discussions'])} discussions",
                 "agent": "research"
             })
         
