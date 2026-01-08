@@ -31,5 +31,9 @@ class Config:
     CACHE_TTL_DAYS = int(os.getenv("CACHE_TTL_DAYS", 7))
     MAX_TOKENS_PER_QUERY = int(os.getenv("MAX_TOKENS_PER_QUERY", 15000))
     BUDGET_LIMIT_TOKENS = int(os.getenv("BUDGET_LIMIT_TOKENS", 100000))
+    
+    # Performance Optimization Settings
+    ENABLE_PARALLEL_SENTIMENT = os.getenv("ENABLE_PARALLEL_SENTIMENT", "true").lower() == "true"
+    SENTIMENT_MAX_WORKERS = int(os.getenv("SENTIMENT_MAX_WORKERS", "4"))
 
 config = Config()
