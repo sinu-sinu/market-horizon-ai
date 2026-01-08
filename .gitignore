@@ -14,7 +14,6 @@ __pycache__/
 .idea/
 
 # Test and coverage data
-/tests/
 *.cover
 .coverage
 htmlcov/
