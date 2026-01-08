@@ -14,11 +14,11 @@ A production-ready system demonstrating advanced AI engineering with multi-agent
 
 ### Screenshots
 
-![Dashboard analysis](frontend/public/panorama 1.png)
+![Dashboard analysis](frontend/public/panorama%201.png)
 
-![Interactive Positioning Map](frontend/public/panorama 2.png)
+![Interactive Positioning Map](frontend/public/panorama%202.png)
 
-![Content Recommendation](frontend/public/panorama 3.png)
+![Content Recommendation](frontend/public/panorama%203.png)
 
 ---
 
