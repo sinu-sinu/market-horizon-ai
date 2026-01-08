@@ -14,11 +14,11 @@ A production-ready system demonstrating advanced AI engineering with multi-agent
 
 ### Screenshots
 
-_[Placeholder: Dashboard view showing competitive positioning map]_
+![Dashboard analysis](frontend/public/panorama 1.png)
 
-_[Placeholder: Content gap analysis results with opportunity scoring]_
+![Interactive Positioning Map](frontend/public/panorama 2.png)
 
-_[Placeholder: Cache management interface]_
+![Content Recommendation](frontend/public/panorama 3.png)
 
 ---
 
