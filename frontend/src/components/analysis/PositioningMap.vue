@@ -186,14 +186,23 @@
       animationDuration: 800,
       animationEasing: 'cubicOut' as const,
       grid: {
-        left: 80,
-        right: 160,
-        top: 60,
-        bottom: 80,
+        left: 90,
+        right: 200, // More space for company labels on the right
+        top: 70,
+        bottom: 90,
+        // Make the grid square by setting explicit equal dimensions
+        width: 500,
+        height: 500,
+        containLabel: false,
       },
       // Interactive toolbox for download, zoom, etc.
       toolbox: {
         show: true,
+        right: 220, // Position inside the chart, accounting for right margin
+        top: 20,
+        orient: 'horizontal',
+        itemSize: 18,
+        itemGap: 12,
         feature: {
           dataZoom: {
             yAxisIndex: false,
@@ -215,6 +224,14 @@
         emphasis: {
           iconStyle: {
             borderColor: '#2563eb',
+          },
+        },
+        tooltip: {
+          show: true,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#e5e7eb',
+          textStyle: {
+            color: '#111827',
           },
         },
       },
@@ -393,13 +410,13 @@
           label: {
             show: true,
             position: 'right',
-            distance: 15,
+            distance: 18, // Increased distance from dot
             formatter: '{b}',
-            fontSize: 12,
+            fontSize: 13, // Slightly larger for readability
             fontWeight: 500,
             color: '#1f2937',
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            padding: [4, 8],
+            padding: [5, 10], // More padding for better appearance
             borderRadius: 4,
             shadowBlur: 4,
             shadowColor: 'rgba(0, 0, 0, 0.05)',
@@ -409,6 +426,7 @@
             hideOverlap: false,
             moveOverlap: 'shiftY',
             draggable: true,
+            dx: 5, // Extra horizontal offset
           },
           labelLine: {
             show: true,
@@ -515,11 +533,6 @@
           <option value="budget-smb">Budget SMB</option>
         </select>
       </div>
-
-      <label class="toggle-label">
-        <input type="checkbox" v-model="showOpportunityZones" class="toggle-checkbox" />
-        <span class="toggle-text">Show Opportunity Zones</span>
-      </label>
     </div>
 
     <div class="chart-container">
@@ -758,11 +771,14 @@
   padding: var(--space-5);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .positioning-chart {
   width: 100%;
-  height: 600px;
+  height: 700px; /* Fixed height to accommodate 500px square grid + margins */
+  min-width: 800px; /* Ensure enough width for grid + right margin labels */
 }
 
 .interaction-hint {
@@ -995,7 +1011,19 @@
   }
 
   .positioning-chart {
-    height: 450px;
+    height: 600px; /* Larger on mobile too */
+    min-width: auto; /* Remove min-width constraint on mobile */
+  }
+
+  .positioning-chart :deep(.echarts-container) {
+    width: 100% !important;
+  }
+  
+  /* Adjust grid size for mobile */
+  @supports (min-width: 0) {
+    .positioning-chart {
+      --grid-size: 400;
+    }
   }
 
   .detail-grid {
