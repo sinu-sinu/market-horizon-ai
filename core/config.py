@@ -35,5 +35,6 @@ class Config:
     # Performance Optimization Settings
     ENABLE_PARALLEL_SENTIMENT = os.getenv("ENABLE_PARALLEL_SENTIMENT", "true").lower() == "true"
     SENTIMENT_MAX_WORKERS = int(os.getenv("SENTIMENT_MAX_WORKERS", "4"))
+    ENABLE_COMBINED_CONTENT_SCORING = os.getenv("ENABLE_COMBINED_CONTENT_SCORING", "true").lower() == "true"
 
 config = Config()
