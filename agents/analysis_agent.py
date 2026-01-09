@@ -95,13 +95,60 @@ class AnalysisAgent:
         chunks = self.text_splitter.create_documents(documents)
         logger.info(f"Created {len(chunks)} document chunks")
         
-        # Create vectorstore
+        # Create vectorstore with instrumentation
+        vectorstore = None
+        vectorstore_path = None
+        
+        # Import observability for span tracking
+        from core.observability import create_span, end_span
+        
+        # Create span for vectorstore creation
+        span_start = datetime.now()
+        span = None
+        if trace_id:
+            try:
+                span = create_span(trace_id, "faiss-vectorstore-creation", {
+                    "num_chunks": len(chunks),
+                    "embedding_model": "text-embedding-3-large"
+                })
+            except Exception as e:
+                logger.debug(f"Failed to create span for vectorstore: {e}")
+        
         try:
+            # This is the potentially slow operation we're measuring
             vectorstore = FAISS.from_documents(chunks, self.embeddings)
             vectorstore_path = self._save_vectorstore(vectorstore)
-            logger.info(f"Vectorstore created and saved to {vectorstore_path}")
+            
+            # Calculate duration
+            duration = (datetime.now() - span_start).total_seconds()
+            logger.info(f"Vectorstore created in {duration:.2f}s and saved to {vectorstore_path}")
+            
+            # End span with success
+            if span:
+                try:
+                    end_span(span, {
+                        "success": True,
+                        "vectorstore_path": vectorstore_path,
+                        "duration_seconds": duration
+                    })
+                except Exception as e:
+                    logger.debug(f"Failed to end span: {e}")
+                    
         except Exception as e:
-            logger.error(f"Failed to create vectorstore: {e}")
+            duration = (datetime.now() - span_start).total_seconds()
+            logger.error(f"Failed to create vectorstore after {duration:.2f}s: {e}")
+            
+            # End span with error
+            if span:
+                try:
+                    end_span(span, {
+                        "success": False,
+                        "error": str(e),
+                        "duration_seconds": duration
+                    })
+                except Exception as ex:
+                    logger.debug(f"Failed to end span: {ex}")
+            
             vectorstore = None
             vectorstore_path = None
         
