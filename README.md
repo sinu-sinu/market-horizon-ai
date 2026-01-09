@@ -8,7 +8,7 @@ A production-ready system demonstrating advanced AI engineering with multi-agent
 
 ## Demo
 
-> [Live Demo](#) | [Video Walkthrough](#) | [Screenshots](#)
+> [Screenshots](#)
 
 **Sample Output:** Input _"CRM tools for real estate agents"_ → Get competitive positioning map, content gap analysis, and strategic recommendations in under 15 seconds.
 
@@ -42,7 +42,7 @@ Marketing teams spend 15-20 hours weekly on manual competitive research: monitor
 **Smart Positioning Engine**
 - 2D competitive landscape visualization using LLM reasoning
 - Market gap detection and opportunity scoring
-- Interactive Plotly charts
+- Interactive ECharts visualizations
 
 **Actionable Content Recommendations**
 - Specific, high-value content ideas (not generic topics)
@@ -81,9 +81,8 @@ Marketing teams spend 15-20 hours weekly on manual competitive research: monitor
 
 **ML/NLP**
 - FAISS (semantic search)
-- Sentence Transformers (embeddings)
-- spaCy (NLP processing)
-- scikit-learn (analysis)
+- OpenAI text-embedding-3-large (embeddings)
+- LLM-based entity extraction
 
 **Infrastructure**
 - Docker + Docker Compose
@@ -211,9 +210,25 @@ curl -X POST http://localhost:8000/api/analyze \
 
 ### Sample Queries
 
-- "AI-powered analytics platforms"
-- "Project management software for startups"
-- "Influencer marketing platforms"
+- "CRM tools for real estate agents in small brokerages"
+- "Project management software for remote creative agencies"
+- "Email marketing platforms for Shopify DTC brands"
+
+### Query Optimization Tips
+
+For best results, structure your queries with **[Product Type] + [Target Audience] + [Industry/Context]**:
+
+| Query Type | Example | Why It Works |
+|------------|---------|--------------|
+| **Niche + Audience** | "expense management software for construction companies" | Specific industry yields relevant competitors |
+| **Comparison Intent** | "Notion alternatives for small marketing teams" | Triggers positioning map generation |
+| **Pain Point Focus** | "customer onboarding tools for B2B SaaS" | Surfaces content gaps and themes |
+| **Size Qualifier** | "analytics dashboards for startups under 50 employees" | Improves positioning accuracy |
+
+**Avoid:**
+- Too generic: "CRM" or "analytics tools"
+- Too broad: "business software"
+- Missing audience: "project management" (add "for distributed teams")
 
 ### Expected Output
 
