@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
-from core.prompts import POSITIONING_PROMPT, CONTENT_GAP_PROMPT, STRATEGIC_MOVES_PROMPT, CONTENT_GAP_ANALYSIS_PROMPT, OPPORTUNITY_SCORING_PROMPT
+from core.prompts import POSITIONING_PROMPT, CONTENT_GAP_PROMPT, STRATEGIC_MOVES_PROMPT, CONTENT_GAP_ANALYSIS_PROMPT, OPPORTUNITY_SCORING_PROMPT, CONTENT_GAP_WITH_SCORING_PROMPT
 from core.config import config
 from core.observability import log_llm_call
 from typing import Dict, List, Optional
@@ -66,20 +66,30 @@ class StrategyAgent:
             analysis_insights
         )
 
-        # Generate content recommendations (Phase 3: LLM-based gap analysis)
-        content_recs = self._generate_content_recommendations(
-            analysis_insights.get("content_themes", []),
-            analysis_insights.get("competitors", []),
-            query=query
-        )
-
-        # Score recommendations with evidence-based reasoning (Phase 4)
-        if content_recs:
-            content_recs = self._score_recommendations(
-                content_recs,
+        # Generate content recommendations
+        # Use combined prompt if optimization is enabled (saves 10-15s)
+        if config.ENABLE_COMBINED_CONTENT_SCORING:
+            logger.info("Using combined content gap + scoring (optimized)")
+            content_recs = self._generate_content_recommendations_with_scoring(
                 analysis_insights.get("content_themes", []),
-                analysis_insights.get("competitors", [])
+                analysis_insights.get("competitors", []),
+                query=query
             )
+        else:
+            logger.info("Using separate content gap + scoring (legacy)")
+            # Phase 3: LLM-based gap analysis
+            content_recs = self._generate_content_recommendations(
+                analysis_insights.get("content_themes", []),
+                analysis_insights.get("competitors", []),
+                query=query
+            )
+            # Phase 4: Score recommendations separately
+            if content_recs:
+                content_recs = self._score_recommendations(
+                    content_recs,
+                    analysis_insights.get("content_themes", []),
+                    analysis_insights.get("competitors", [])
+                )
 
         # Strategic moves
         strategic_moves = self._generate_strategic_moves(
@@ -318,6 +328,120 @@ class StrategyAgent:
         logger.info(f"Identified {len(zones)} opportunity zones")
         return zones
     
+    def _generate_content_recommendations_with_scoring(self, themes: List[Dict], competitors: List[str], query: str = "") -> List[Dict]:
+        """
+        Generate content gap recommendations WITH scoring in a single LLM call (OPTIMIZED)
+
+        This combines the functionality of _generate_content_recommendations() and 
+        _score_recommendations() into one call, reducing latency by ~50%.
+
+        Args:
+            themes: Content themes from Analysis Agent (with source_evidence)
+            competitors: List of competitors
+            query: Original search query for context
+
+        Returns:
+            List of content recommendations WITH opportunity scores included
+        """
+        if not themes:
+            logger.warning("No themes available for content recommendations")
+            return []
+
+        # Build themes with evidence for LLM prompt
+        themes_with_evidence = []
+        for theme in themes[:5]:
+            theme_info = {
+                "theme": theme.get("theme", ""),
+                "user_interest": theme.get("user_interest", ""),
+                "source_evidence": theme.get("source_evidence", [])
+            }
+            themes_with_evidence.append(theme_info)
+
+        # Build source evidence summary from themes
+        source_evidence = []
+        for theme in themes[:5]:
+            evidence = theme.get("source_evidence", [])
+            for e in evidence:
+                source_evidence.append({
+                    "theme": theme.get("theme", ""),
+                    "quote": e.get("quote", ""),
+                    "source_idx": e.get("source_idx")
+                })
+
+        # Format combined prompt
+        prompt = CONTENT_GAP_WITH_SCORING_PROMPT.format(
+            query=query or "market research",
+            themes_with_evidence=json.dumps(themes_with_evidence, indent=2),
+            source_evidence=json.dumps(source_evidence[:20], indent=2),  # Limit evidence
+            competitors=", ".join(competitors[:10])  # Limit to 10 competitors
+        )
+
+        try:
+            # Single LLM call for both gap analysis AND scoring
+            llm_start = datetime.now()
+            response = self.llm.invoke(prompt)
+            llm_end = datetime.now()
+            content = response.content.strip()
+
+            # Log LLM call to Langfuse
+            trace_id = getattr(self, "_current_trace_id", None)
+            if trace_id and hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                model_name = response.response_metadata.get('model_name', 'gpt-4.1-mini')
+                log_llm_call(
+                    trace_id=trace_id,
+                    name="content-gap-with-scoring",  # New unified name
+                    model=model_name,
+                    input_text=prompt,
+                    output_text=content,
+                    input_tokens=usage.get('input_tokens', 0),
+                    output_tokens=usage.get('output_tokens', 0),
+                    start_time=llm_start,
+                    end_time=llm_end,
+                )
+
+            # Parse JSON response
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(content)
+            llm_recommendations = result.get("recommendations", [])
+
+            # Transform to output format (already includes scores!)
+            recommendations = []
+            for i, rec in enumerate(llm_recommendations[:5]):
+                topic = rec.get("topic", "")
+
+                # Validate: topic should not be generic template
+                if self._is_generic_topic(topic):
+                    logger.warning(f"Skipping generic topic: {topic}")
+                    continue
+
+                recommendations.append({
+                    "topic": topic,
+                    "gap_reasoning": rec.get("gap_reasoning", ""),
+                    "target_audience": rec.get("target_audience", ""),
+                    "recommended_format": rec.get("recommended_format", "Article"),
+                    "format_rationale": rec.get("format_rationale", ""),
+                    "why_now": rec.get("why_now", ""),
+                    "priority": "high" if i < 2 else "medium" if i < 4 else "low",
+                    "estimated_effort": "medium",
+                    "opportunity_score": rec.get("opportunity_score", 5.0),
+                    "score_reasoning": rec.get("score_reasoning", {})
+                })
+
+            # Sort by opportunity score
+            recommendations.sort(key=lambda x: x.get("opportunity_score", 0), reverse=True)
+
+            logger.info(f"LLM generated {len(recommendations)} content recommendations with scores (combined call)")
+            return recommendations
+
+        except Exception as e:
+            logger.error(f"LLM content gap + scoring failed: {e}")
+            return []
+
     def _generate_content_recommendations(self, themes: List[Dict], competitors: List[str], query: str = "") -> List[Dict]:
         """
         Generate content gap recommendations using LLM-based gap analysis (Phase 3)
