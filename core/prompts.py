@@ -472,6 +472,97 @@ Score all provided recommendations.
 """
 
 # ============================================================================
+# COMBINED CONTENT GAP + SCORING PROMPT (Performance Optimization)
+# ============================================================================
+
+CONTENT_GAP_WITH_SCORING_PROMPT = """
+You are a content strategist analyzing market research to identify AND score content opportunities.
+
+Query context: {query}
+
+Themes identified (with source evidence):
+{themes_with_evidence}
+
+Source evidence context:
+{source_evidence}
+
+Competitors in market:
+{competitors}
+
+Your task: For each theme, identify a SPECIFIC content gap, generate an actionable recommendation, AND provide an evidence-based opportunity score.
+
+A CONTENT GAP is something users want to know that existing content doesn't adequately address.
+
+For each recommendation, provide:
+1. topic: A specific, actionable article title (NOT generic like "Deep dive into X")
+2. gap_reasoning: What question do users have that competitors don't answer?
+3. target_audience: Who specifically would benefit from this content?
+4. recommended_format: Tutorial|Comparison|Case Study|Checklist|Guide
+5. format_rationale: Why this format serves the audience best
+6. why_now: What signals indicate this content is needed now?
+7. opportunity_score: Weighted average of demand_signal (40%), competitive_gap (40%), actionability (20%)
+8. score_reasoning: Evidence for each dimension
+
+GOOD RECOMMENDATION EXAMPLES:
+- topic: "Step-by-step CRM data migration checklist: What to prepare before switching"
+  gap_reasoning: "Sources discuss migration difficulty but none provide actionable preparation steps"
+  opportunity_score: 8.4 (high demand, clear gap, easy to create)
+
+- topic: "HubSpot vs Salesforce for real estate teams under 10 agents: A cost analysis"
+  gap_reasoning: "Comparisons exist but none focus on small real estate team economics"
+  opportunity_score: 7.6 (moderate demand, good gap, moderate complexity)
+
+BAD RECOMMENDATION EXAMPLES (DO NOT OUTPUT):
+- "Deep dive into CRM" (too generic)
+- "Everything about lead management" (not specific)
+- "CRM best practices" (doesn't address a gap)
+
+Scoring dimensions (1-10 scale):
+
+1. **demand_signal** (1-10): How strongly do sources indicate user interest?
+   - 8-10: Multiple sources explicitly mention this as a pain point or frequent question
+   - 5-7: Some sources discuss this topic with engagement signals
+   - 1-4: Weak or no evidence of user demand
+
+2. **competitive_gap** (1-10): How underserved is this topic?
+   - 8-10: No competitors adequately address this; clear whitespace
+   - 5-7: Competitors touch on this but leave gaps
+   - 1-4: Well-covered by multiple competitors
+
+3. **actionability** (1-10): How easily can this content be created?
+   - 8-10: Clear format, well-defined scope, executable immediately
+   - 5-7: Moderate complexity, may need some research
+   - 1-4: Requires deep expertise or extensive research
+
+Calculate: opportunity_score = (demand_signal * 0.4) + (competitive_gap * 0.4) + (actionability * 0.2)
+
+Output ONLY valid JSON in this exact format:
+{{
+  "recommendations": [
+    {{
+      "topic": "Specific, actionable article title",
+      "gap_reasoning": "What's missing from existing content that users need",
+      "target_audience": "Specific audience segment",
+      "recommended_format": "Tutorial|Comparison|Case Study|Checklist|Guide",
+      "format_rationale": "Why this format serves the audience best",
+      "why_now": "What signals indicate this content is timely",
+      "opportunity_score": 7.8,
+      "score_reasoning": {{
+        "demand_signal": 8,
+        "demand_evidence": "3 sources mention lead scoring as top pain point",
+        "competitive_gap": 7,
+        "gap_evidence": "Competitors discuss leads but not scoring mechanics",
+        "actionability": 9,
+        "actionability_reasoning": "Tutorial format, clear step-by-step structure possible"
+      }}
+    }}
+  ]
+}}
+
+Generate exactly 5 recommendations, one per theme.
+"""
+
+# ============================================================================
 # CONTEXTUAL SENTIMENT PROMPT (Phase 5 Fix)
 # ============================================================================
 
@@ -552,6 +643,7 @@ __all__ = [
     'THEME_EXTRACTION_PROMPT',
     'CONTENT_GAP_ANALYSIS_PROMPT',
     'OPPORTUNITY_SCORING_PROMPT',
+    'CONTENT_GAP_WITH_SCORING_PROMPT',
     'CONTEXTUAL_SENTIMENT_PROMPT',
     'format_prompt'
 ]
